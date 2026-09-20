@@ -362,6 +362,37 @@ impl BitmapPlanner {
         }
     }
 
+    /// Whether some non-ParadeDB index of the relation covers at least one of the
+    /// HeapFilter clauses of `query`: the question the DataFusion paths ask before they
+    /// take a relation over, since their scans evaluate a HeapFilter per document and
+    /// have no bitmap to intersect. Builds the candidate path the way [`Self::harvest`]
+    /// does, without its ctid-order warning, and takes the first workable index unscored.
+    pub unsafe fn covers_a_heap_filter(
+        root: *mut pg_sys::PlannerInfo,
+        rel: *mut pg_sys::RelOptInfo,
+        bm25_oid: pg_sys::Oid,
+        query: &SearchQueryInput,
+    ) -> Option<String> {
+        if !gucs::enable_bitmap_intersection() || rel.is_null() {
+            return None;
+        }
+        let planner = Self::from_search_query(root, rel, bm25_oid, query, None)?;
+        let harvested = unsafe {
+            planner
+                .build_bitmap_path()
+                .and_then(|(bhp, build_cost)| planner.accept(bhp, build_cost))
+        }?;
+        let bm25 = PgSearchRelation::open(bm25_oid);
+        let context = PlannerContext::from_planner(root);
+        let covered = harvested
+            .covered
+            .iter()
+            .map(|(clause, _)| deparse_expr(Some(&context), &bm25, *clause))
+            .collect::<Vec<_>>()
+            .join(" AND ");
+        Some(covered)
+    }
+
     /// Accept or reject one candidate: walk its bitmapqual tree enforcing the
     /// module-level scope rules, and require that it covers at least one of our
     /// HeapExpr clauses.

@@ -28,6 +28,7 @@ use super::join_targetlist::ExtractedDataFusionTarget;
 use super::privdat::{ColumnRef, CompareOp, FilterExpr};
 use crate::api::operator::{SearchPredicate, expr_contains_search_predicate};
 use crate::index::fast_fields_helper::{FieldCardinality, WhichFastField};
+use crate::postgres::customscan::bitmap_intersection::BitmapPlanner;
 use crate::postgres::customscan::builders::custom_path::RestrictInfoType;
 use crate::postgres::customscan::datafusion::translator::PredicateTranslator;
 use crate::postgres::customscan::joinscan::build::{
@@ -615,9 +616,11 @@ unsafe fn build_scan_node(
     // + post-filter lowering isn't wired in this path yet.
     let rel_array = (*root).simple_rel_array;
     let mut classified = ClassifiedBaseRestrictInfo::empty();
+    let mut base_rel: *mut pg_sys::RelOptInfo = std::ptr::null_mut();
     if !rel_array.is_null() && (rti as isize) < (*root).simple_rel_array_size as isize {
         let rel = *rel_array.offset(rti as isize);
         if !rel.is_null() {
+            base_rel = rel;
             let baserestrictinfo = PgList::<pg_sys::RestrictInfo>::from_pg((*rel).baserestrictinfo);
             if missing_partial_index_predicate(bm25_index.rd_indpred, &baserestrictinfo) {
                 return Err("query does not imply the partial index predicate".into());
@@ -674,6 +677,22 @@ unsafe fn build_scan_node(
         })?;
         optimize_quals_with_heap_expr(&mut qual);
         let query = SearchQueryInput::from(&qual);
+        // A HeapFilter runs once per document of the scan, against the heap. When
+        // another index of the table covers the same clause, the Postgres plan
+        // intersects that index's bitmap with the search (the base scan's bitmap
+        // intersection) and never touches the rows the clause rejects; the DataFusion
+        // scan has no such bitmap and would fetch every document the search matches.
+        // A spatial test on a GiST-indexed column over a large table is the case in
+        // point. Leave such a join to Postgres.
+        if let Some(covered) =
+            BitmapPlanner::covers_a_heap_filter(root, base_rel, bm25_index.oid(), &query)
+        {
+            return Err(format!(
+                "the predicate {covered} on {} is served by another index, which the \
+                 DataFusion scan cannot use",
+                source.alias.as_deref().unwrap_or("unknown"),
+            ));
+        }
         candidate = candidate.with_query(query);
         if state.uses_our_operator {
             candidate = candidate.with_search_predicate();

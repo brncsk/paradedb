@@ -33,6 +33,7 @@ use super::predicate::{
 };
 use super::privdat::{OutputColumnInfo, PrivateData};
 use super::window_func::{WindowAgg, WindowAggDef, WindowAggId, extract_window_agg};
+use crate::postgres::customscan::bitmap_intersection::BitmapPlanner;
 use crate::postgres::customscan::datafusion::explain::get_attname_safe;
 use crate::postgres::customscan::datafusion::translator::PredicateTranslator;
 use crate::postgres::customscan::node::CustomScanNodeExt;
@@ -202,6 +203,18 @@ pub(super) unsafe fn collect_join_sources_base_rel(
             )?;
             optimize_quals_with_heap_expr(&mut qual);
             let query = SearchQueryInput::from(&qual);
+            // A HeapFilter another index of the table covers is a bitmap intersection
+            // in the Postgres plan and a heap fetch per matching document here; leave
+            // such a join to Postgres. See `BitmapPlanner::covers_a_heap_filter`.
+            if let Some(covered) =
+                BitmapPlanner::covers_a_heap_filter(root, rel, bm25_index.oid(), &query)
+            {
+                pgrx::debug1!(
+                    "JoinScan declined: the predicate {covered} of rti {rti} is served by \
+                     another index, which the DataFusion scan cannot use"
+                );
+                return None;
+            }
             side_info = side_info.with_query(query);
             if state.uses_our_operator {
                 side_info = side_info.with_search_predicate();

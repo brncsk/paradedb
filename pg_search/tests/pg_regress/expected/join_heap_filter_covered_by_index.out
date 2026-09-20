@@ -1,0 +1,174 @@
+-- A DataFusion scan (the join scan, and the aggregate scan over a join)
+-- evaluates a heap filter once per document the search matches, against
+-- the heap, and has no bitmap to intersect. When another index of the
+-- table covers such a clause, the relation is left to Postgres, whose base
+-- scan intersects that index's bitmap with the search and never fetches
+-- the rows the clause rejects.
+CREATE EXTENSION IF NOT EXISTS pg_search;
+SET max_parallel_workers_per_gather = 0;
+SET paradedb.enable_aggregate_custom_scan TO on;
+SET paradedb.enable_join_custom_scan TO on;
+CREATE TABLE covered_places (
+    id BIGINT PRIMARY KEY,
+    name TEXT,
+    location POINT
+);
+CREATE TABLE covered_shapes (
+    id BIGINT PRIMARY KEY,
+    place_id BIGINT,
+    kind TEXT
+);
+-- 10k places on a 100x100 grid, one shape each.
+INSERT INTO covered_places (id, name, location)
+SELECT i, 'place ' || i, point(i % 100, i / 100)
+FROM generate_series(0, 9999) i;
+INSERT INTO covered_shapes (id, place_id, kind)
+SELECT i, i, CASE WHEN i % 2 = 0 THEN 'footprint' ELSE 'body' END
+FROM generate_series(0, 9999) i;
+CREATE INDEX covered_places_idx ON covered_places USING paradedb (id, name);
+CREATE INDEX covered_places_location ON covered_places USING gist (location);
+CREATE INDEX covered_shapes_idx ON covered_shapes USING paradedb (id, place_id, kind);
+VACUUM ANALYZE covered_places, covered_shapes;
+-- A count over the join, whose location test the GiST index covers: the
+-- aggregate scan declines, and the places' base scan intersects the
+-- GiST bitmap with the search.
+EXPLAIN (FORMAT TEXT, COSTS OFF, TIMING OFF)
+SELECT count(*)
+FROM covered_places p
+JOIN covered_shapes s ON s.place_id = p.id
+WHERE p.name ||| 'place'
+  AND p.location <@ box '((10,10),(12,12))'
+  AND s.kind ||| 'footprint';
+WARNING:  Aggregate Scan (DataFusion) not used: the predicate (location <@ '(12,12),(10,10)'::box) on p is served by another index, which the DataFusion scan cannot use (table: join)
+                                                                                                                                                                                                                QUERY PLAN                                                                                                                                                                                                                 
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate
+   ->  Hash Join
+         Hash Cond: (s.place_id = p.id)
+         ->  Custom Scan (ParadeDB Base Scan) on covered_shapes s
+               Table: covered_shapes
+               Index: covered_shapes_idx
+               Exec Method: ColumnarExecState
+               Columnar: place_id
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"match":{"field":"kind","value":"footprint","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
+         ->  Hash
+               ->  Custom Scan (ParadeDB Base Scan) on covered_places p
+                     Table: covered_places
+                     Index: covered_places_idx
+                     Bitmap Intersection: covered_places_location
+                     Exec Method: ColumnarExecState
+                     Columnar: id
+                     Scores: false
+                     Tantivy Query: {"boolean":{"must":[{"heap_filter":{"indexed_query":{"boolean":{"must":[{"with_index":{"query":{"match":{"field":"name","value":"place","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}]}},"always_filters":[],"recheck_filters":[{"heap_filter":"(location <@ '(12,12),(10,10)'::box)"}],"uses_tid_bitmap":true,"bitmap_consumer_id":0}}]}}
+                     ->  Bitmap Index Scan on covered_places_location
+                           Index Cond: (location <@ '(12,12),(10,10)'::box)
+(21 rows)
+
+SELECT count(*)
+FROM covered_places p
+JOIN covered_shapes s ON s.place_id = p.id
+WHERE p.name ||| 'place'
+  AND p.location <@ box '((10,10),(12,12))'
+  AND s.kind ||| 'footprint';
+WARNING:  Aggregate Scan (DataFusion) not used: the predicate (location <@ '(12,12),(10,10)'::box) on p is served by another index, which the DataFusion scan cannot use (table: join)
+ count 
+-------
+     6
+(1 row)
+
+-- The join scan declines the same relation for a Top-K over the join.
+EXPLAIN (FORMAT TEXT, COSTS OFF, TIMING OFF)
+SELECT p.id, s.id
+FROM covered_places p
+JOIN covered_shapes s ON s.place_id = p.id
+WHERE p.name ||| 'place'
+  AND p.location <@ box '((10,10),(12,12))'
+  AND s.kind ||| 'footprint'
+ORDER BY p.id
+LIMIT 5;
+WARNING:  JoinScan not used: the predicate (location <@ '(12,12),(10,10)'::box) on p is served by another index, which the DataFusion scan cannot use (tables: p, s)
+                                                                                                                                                                                                                   QUERY PLAN                                                                                                                                                                                                                    
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit
+   ->  Sort
+         Sort Key: p.id
+         ->  Hash Join
+               Hash Cond: (s.place_id = p.id)
+               ->  Custom Scan (ParadeDB Base Scan) on covered_shapes s
+                     Table: covered_shapes
+                     Index: covered_shapes_idx
+                     Exec Method: ColumnarExecState
+                     Columnar: id, place_id
+                     Scores: false
+                     Tantivy Query: {"with_index":{"query":{"match":{"field":"kind","value":"footprint","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
+               ->  Hash
+                     ->  Custom Scan (ParadeDB Base Scan) on covered_places p
+                           Table: covered_places
+                           Index: covered_places_idx
+                           Bitmap Intersection: covered_places_location
+                           Exec Method: ColumnarExecState
+                           Columnar: id
+                           Scores: false
+                           Tantivy Query: {"boolean":{"must":[{"heap_filter":{"indexed_query":{"boolean":{"must":[{"with_index":{"query":{"match":{"field":"name","value":"place","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}]}},"always_filters":[],"recheck_filters":[{"heap_filter":"(location <@ '(12,12),(10,10)'::box)"}],"uses_tid_bitmap":true,"bitmap_consumer_id":0}}]}}
+                           ->  Bitmap Index Scan on covered_places_location
+                                 Index Cond: (location <@ '(12,12),(10,10)'::box)
+(23 rows)
+
+SELECT p.id, s.id
+FROM covered_places p
+JOIN covered_shapes s ON s.place_id = p.id
+WHERE p.name ||| 'place'
+  AND p.location <@ box '((10,10),(12,12))'
+  AND s.kind ||| 'footprint'
+ORDER BY p.id
+LIMIT 5;
+WARNING:  JoinScan not used: the predicate (location <@ '(12,12),(10,10)'::box) on p is served by another index, which the DataFusion scan cannot use (tables: p, s)
+  id  |  id  
+------+------
+ 1010 | 1010
+ 1012 | 1012
+ 1110 | 1110
+ 1112 | 1112
+ 1210 | 1210
+(5 rows)
+
+-- Without the bitmap intersection no index covers the clause for the
+-- search, and the DataFusion scans take the join, with the same answers.
+SET paradedb.enable_bitmap_intersection = off;
+EXPLAIN (FORMAT TEXT, COSTS OFF, TIMING OFF)
+SELECT count(*)
+FROM covered_places p
+JOIN covered_shapes s ON s.place_id = p.id
+WHERE p.name ||| 'place'
+  AND p.location <@ box '((10,10),(12,12))'
+  AND s.kind ||| 'footprint';
+                                                                                                                                                                                                  QUERY PLAN                                                                                                                                                                                                  
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Custom Scan (ParadeDB Aggregate Scan)
+   Backend: DataFusion
+   Indexes: covered_places_idx (p), covered_shapes_idx (s)
+   Aggregates: COUNT(*)
+   DataFusion Physical Plan: 
+     : AggregateExec: mode=Single, gby=[], aggr=[count(1) as agg_0]
+     :   HashJoinExec: mode=CollectLeft, join_type=Inner, on=[(place_id@0, id@0)], projection=[]
+     :     CooperativeExec
+     :       PgSearchScan: table=s, segments=1, visibility=eager, query={"with_index":{"query":{"match":{"field":"kind","value":"footprint","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
+     :     CooperativeExec
+     :       PgSearchScan: table=p, segments=1, dynamic_filters=1, visibility=eager, query={"boolean":{"must":[{"with_index":{"query":{"match":{"field":"name","value":"place","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"heap_filter":{"indexed_query":"all","always_filters":[{"heap_filter":"(location <@ '(12,12),(10,10)'::box)"}]}}]}}
+(11 rows)
+
+SELECT count(*)
+FROM covered_places p
+JOIN covered_shapes s ON s.place_id = p.id
+WHERE p.name ||| 'place'
+  AND p.location <@ box '((10,10),(12,12))'
+  AND s.kind ||| 'footprint';
+ count 
+-------
+     6
+(1 row)
+
+RESET paradedb.enable_bitmap_intersection;
+DROP TABLE covered_shapes;
+DROP TABLE covered_places;
