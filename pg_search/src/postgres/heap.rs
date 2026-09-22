@@ -31,6 +31,7 @@ use crate::postgres::rel::PgSearchRelation;
 use crate::postgres::storage::buffer::{BorrowedBuffer, BufferManager, PinnedBuffer};
 use crate::postgres::utils;
 use crate::scan::deferred_encode::DeferredCtid;
+use crate::postgres::utils::TransactionScopedContext;
 use crate::schema::{CategorizedFieldData, FieldSource, SearchField};
 use parking_lot::Mutex;
 use pgrx::pg_sys::{self, BlockNumber};
@@ -1430,17 +1431,31 @@ crate::impl_safe_drop!(HeapFetchState, |self| {
 pub struct ExpressionState {
     econtext: *mut pg_sys::ExprContext,
     expr_states: Vec<*mut pg_sys::ExprState>,
+    /// The context [`Self::new`] made, which holds everything above and is freed with the
+    /// state. `None` for a state built by [`Self::new_in_context`], whose memory the caller owns.
+    owned: Option<TransactionScopedContext>,
 }
 
 impl ExpressionState {
-    /// Create an ExpressionState for the given index relation.
+    /// Create an ExpressionState for the given index relation, in a memory context of its own
+    /// that is freed with the state.
+    ///
+    /// The state is built lazily, from inside tantivy callbacks where `CurrentMemoryContext`
+    /// can be a per-tuple context, so it needs a context that outlives its caller. It used to
+    /// be built straight in `TopTransactionContext`, which frees nothing before the
+    /// transaction ends: every reader opened over a mutable segment left its expression
+    /// context and its compiled index expressions behind, and a nested-loop rescan that opened
+    /// a reader per outer row ran the transaction out of memory.
     pub fn new(indexrel: &PgSearchRelation) -> Self {
-        unsafe {
-            Self::new_in_context(indexrel, &mut pgrx::PgMemoryContexts::TopTransactionContext)
-        }
+        let owned = TransactionScopedContext::new(c"pg_search expression state");
+        let mut state = unsafe {
+            Self::new_in_context(indexrel, &mut pgrx::PgMemoryContexts::For(owned.as_ptr()))
+        };
+        state.owned = Some(owned);
+        state
     }
 
-    /// The memory context must outlive the returned expression state.
+    /// The memory context must outlive the returned expression state, and owns what it holds.
     pub unsafe fn new_in_context(
         indexrel: &PgSearchRelation,
         memory_context: &mut pgrx::PgMemoryContexts,
@@ -1462,6 +1477,7 @@ impl ExpressionState {
             Self {
                 econtext,
                 expr_states,
+                owned: None,
             }
         })
     }
@@ -1495,6 +1511,18 @@ impl ExpressionState {
         expr_results
     }
 }
+
+crate::impl_safe_drop!(ExpressionState, |self| {
+    // The expression context runs its shutdown callbacks before its memory goes with the owned
+    // context. A state in a caller's context is the caller's to free; one whose transaction has
+    // ended is gone already.
+    if let Some(owned) = &self.owned
+        && owned.is_alive()
+        && !self.econtext.is_null()
+    {
+        unsafe { pg_sys::FreeExprContext(self.econtext, true) };
+    }
+});
 
 /// Rebuilds the index document for individual ctids by re-fetching their rows from the heap.
 ///

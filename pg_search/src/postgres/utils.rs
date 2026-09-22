@@ -40,6 +40,7 @@ use pgrx::itemptr::{item_pointer_get_both, item_pointer_set_all};
 use pgrx::*;
 use rustc_hash::FxHashMap;
 use std::collections::BTreeMap;
+use std::ffi::CStr;
 
 use std::str::FromStr;
 use tokenizers::SearchNormalizer;
@@ -218,6 +219,79 @@ impl Default for ExprContextGuard {
         Self::new()
     }
 }
+
+/// A memory context of its own under `TopTransactionContext`, deleted when this guard drops
+/// or when the transaction ends, whichever comes first.
+///
+/// For state that is built from inside a callback, where `CurrentMemoryContext` may be a
+/// per-tuple context that resets under the caller, but that must not outlive its owner:
+/// `TopTransactionContext` gives the lifetime guarantee, the guard gives the release. A reset
+/// callback on the context records the end of the transaction, so a guard dropped after it
+/// does not delete the context twice.
+#[derive(Debug)]
+pub struct TransactionScopedContext {
+    context: pg_sys::MemoryContext,
+    /// Set by the context's reset callback. Allocated in `TopMemoryContext`, so it outlives the
+    /// context it reports on, and freed with the guard.
+    freed: *mut bool,
+}
+
+// SAFETY: PostgreSQL doesn't execute within threads, despite Tantivy expecting it.
+unsafe impl Send for TransactionScopedContext {}
+unsafe impl Sync for TransactionScopedContext {}
+
+impl TransactionScopedContext {
+    /// Creates the context, named `name` in memory context dumps.
+    pub fn new(name: &'static CStr) -> Self {
+        unsafe {
+            let context = pg_sys::AllocSetContextCreateExtended(
+                PgMemoryContexts::TopTransactionContext.value(),
+                name.as_ptr(),
+                pg_sys::ALLOCSET_DEFAULT_MINSIZE as usize,
+                pg_sys::ALLOCSET_DEFAULT_INITSIZE as usize,
+                pg_sys::ALLOCSET_DEFAULT_MAXSIZE as usize,
+            );
+            let freed = PgMemoryContexts::TopMemoryContext
+                .palloc0(size_of::<bool>())
+                .cast::<bool>();
+            // The callback lives in the context it watches, as PostgreSQL asks it to.
+            let callback = PgMemoryContexts::For(context)
+                .palloc0(size_of::<pg_sys::MemoryContextCallback>())
+                .cast::<pg_sys::MemoryContextCallback>();
+            (*callback).func = Some(mark_freed);
+            (*callback).arg = freed.cast();
+            pg_sys::MemoryContextRegisterResetCallback(context, callback);
+            Self { context, freed }
+        }
+    }
+
+    /// Whether the context still exists: false once the transaction has ended.
+    pub fn is_alive(&self) -> bool {
+        unsafe { !*self.freed }
+    }
+
+    pub fn as_ptr(&self) -> pg_sys::MemoryContext {
+        self.context
+    }
+
+    /// Runs `f` with this context current.
+    pub fn switch_to<R>(&self, f: impl FnOnce() -> R) -> R {
+        unsafe { PgMemoryContexts::For(self.context).switch_to(|_| f()) }
+    }
+}
+
+unsafe extern "C-unwind" fn mark_freed(arg: *mut core::ffi::c_void) {
+    unsafe { *arg.cast::<bool>() = true };
+}
+
+impl_safe_drop!(TransactionScopedContext, |self| {
+    unsafe {
+        if !*self.freed {
+            pg_sys::MemoryContextDelete(self.context);
+        }
+        pg_sys::pfree(self.freed.cast());
+    }
+});
 
 /// Recursively sort all object keys in JSON for deterministic output
 pub fn sort_json_keys(value: &mut serde_json::Value) {

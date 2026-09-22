@@ -19,6 +19,7 @@ use std::ptr::NonNull;
 
 use crate::postgres::heap::HeapFetchState;
 use crate::postgres::rel::PgSearchRelation;
+use crate::postgres::utils::TransactionScopedContext;
 use crate::query::PostgresPointer;
 use crate::query::tid_bitmap_stream::{BitmapCell, BitmapCursor};
 
@@ -42,6 +43,9 @@ pub struct HeapFieldFilter {
 
     #[serde(skip)]
     initialized_expression: Option<(*mut pg_sys::ExprState, Option<NonNull<pg_sys::PlanState>>)>,
+    /// The context the initialized expression lives in, freed with the filter.
+    #[serde(skip)]
+    expression_context: Option<TransactionScopedContext>,
     #[serde(skip)]
     heap_fetch_state: Option<HeapFetchState>,
     #[serde(skip)]
@@ -54,6 +58,7 @@ impl Clone for HeapFieldFilter {
             expr_node: self.expr_node.clone(),
             heap_filter: self.heap_filter.clone(),
             initialized_expression: None,
+            expression_context: None,
             heap_fetch_state: None,
             scratch_context: None,
         }
@@ -89,6 +94,7 @@ impl HeapFieldFilter {
             expr_node: PostgresPointer(expr_node.cast()),
             heap_filter,
             initialized_expression: None,
+            expression_context: None,
             heap_fetch_state: None,
             scratch_context: None,
         }
@@ -196,8 +202,14 @@ impl HeapFieldFilter {
         planstate: Option<NonNull<pg_sys::PlanState>>,
     ) -> *mut pg_sys::ExprState {
         let planstate_ptr = planstate.map_or(std::ptr::null_mut(), |ps| ps.as_ptr());
-        let new_state = PgMemoryContexts::TopTransactionContext
-            .switch_to(|_| pg_sys::ExecInitExpr(expr_node.cast(), planstate_ptr));
+        // The state needs a context that outlives the scan's per-tuple contexts, and one that
+        // goes with the filter: `TopTransactionContext` alone kept a state per filter instance
+        // until the transaction ended. A state initialized again with a plan state leaves the
+        // first one in the same context; the filter never evaluates it again.
+        let context = self
+            .expression_context
+            .get_or_insert_with(|| TransactionScopedContext::new(c"pg_search heap filter"));
+        let new_state = context.switch_to(|| pg_sys::ExecInitExpr(expr_node.cast(), planstate_ptr));
         self.initialized_expression = Some((new_state, planstate));
         new_state
     }

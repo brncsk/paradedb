@@ -1,0 +1,5 @@
+---
+header: stability
+---
+
+A reader that materializes a mutable segment (rows the transaction has written that no persisted segment holds yet) built the evaluation state of the index expressions in `TopTransactionContext`, where it stayed until the transaction ended, one per reader; a nested-loop rescan that opened a reader per outer row ran the backend out of memory. The state now lives in a memory context of its own that is freed with the reader, and so does the expression state a heap filter initializes.
