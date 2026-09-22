@@ -1,0 +1,51 @@
+-- A search whose query is computed at execution time, from a parameter or
+-- from an outer row, cannot be estimated by the index at plan time. The
+-- operator's estimator gave it the selectivity of a query that matches next
+-- to nothing (one row in a hundred thousand), which put the scan on the
+-- inner side of nested loops that rescanned it once per outer row. It is now
+-- estimated as a parameterized query, like a bare parameter.
+CREATE EXTENSION IF NOT EXISTS pg_search;
+CREATE TABLE runtime_query_selectivity (
+    id bigint PRIMARY KEY,
+    category text,
+    body text
+);
+CREATE INDEX runtime_query_selectivity_idx
+ON runtime_query_selectivity USING paradedb (id, ((category)::pdb.literal), body);
+INSERT INTO runtime_query_selectivity
+SELECT g, 'c' || (g % 10), 'body ' || g FROM generate_series(1, 10000) g;
+ANALYZE runtime_query_selectivity;
+-- The estimated rows of the scan of the table in the plan of `q`, whichever scan it is.
+CREATE FUNCTION runtime_query_selectivity_plan_rows(q text) RETURNS numeric AS $$
+DECLARE plan jsonb;
+BEGIN
+  EXECUTE 'EXPLAIN (FORMAT JSON) ' || q INTO plan;
+  RETURN (jsonb_path_query_first(plan, 'strict $.** ? (@."Relation Name" == "runtime_query_selectivity")."Plan Rows"'))::numeric;
+END $$ LANGUAGE plpgsql;
+-- A query built from a parameter, in a generic plan.
+SET plan_cache_mode = force_generic_plan;
+PREPARE runtime_query_selectivity_by_category(text) AS
+  SELECT * FROM runtime_query_selectivity WHERE id @@@ paradedb.term('category', $1);
+SELECT runtime_query_selectivity_plan_rows(
+  $$EXECUTE runtime_query_selectivity_by_category('c1')$$
+) BETWEEN 500 AND 2000 AS parameter_estimated_as_parameterized;
+ parameter_estimated_as_parameterized 
+--------------------------------------
+ t
+(1 row)
+
+RESET plan_cache_mode;
+-- A query built from the row of another relation, in a join.
+SELECT runtime_query_selectivity_plan_rows(
+  $$SELECT c.name, r.id
+      FROM (VALUES ('c1'), ('c2')) AS c(name)
+      JOIN runtime_query_selectivity r ON r.id @@@ paradedb.term('category', c.name)$$
+) BETWEEN 500 AND 2000 AS outer_row_estimated_as_parameterized;
+ outer_row_estimated_as_parameterized 
+--------------------------------------
+ t
+(1 row)
+
+DEALLOCATE runtime_query_selectivity_by_category;
+DROP FUNCTION runtime_query_selectivity_plan_rows(text);
+DROP TABLE runtime_query_selectivity;

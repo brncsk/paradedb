@@ -133,11 +133,14 @@ pub(super) fn query_input_selectivity(
             // or `current_setting(...)::searchqueryinput`. For estimation, fold it the way
             // core's restriction estimators do in `get_restriction_variable()`:
             // `estimate_expression_value()` evaluates STABLE functions at plan time for
-            // costing purposes only. An expression that still does not fold keeps
-            // UNKNOWN_SELECTIVITY.
+            // costing purposes only. An expression that does not fold is one solved at
+            // execution time from a parameter or from an outer row, and is estimated as a
+            // parameterized query, like a bare Param: UNKNOWN_SELECTIVITY, one row in a
+            // hundred thousand, told the planner such a scan returned next to nothing and
+            // put it on the inner side of nested loops that rescanned it per outer row.
             let estimated = unsafe { pg_sys::estimate_expression_value(planner_info, rhs) };
             let Some(const_) = (unsafe { nodecast!(Const, T_Const, estimated) }) else {
-                return UNKNOWN_SELECTIVITY;
+                return PARAMETERIZED_SELECTIVITY;
             };
             let (heaprelid, _, _) = unsafe { find_var_relation(var, planner_info) };
             let Some((_, indexrel)) = rel_get_bm25_index(heaprelid) else {

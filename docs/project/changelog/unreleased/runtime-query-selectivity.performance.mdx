@@ -1,0 +1,5 @@
+---
+header: performance
+---
+
+A search whose query is computed at execution time, from a parameter or from an outer row, was estimated as matching one row in a hundred thousand, which put the scan on the inner side of nested loops that rescanned it once per outer row. It is now estimated as a parameterized query, like a bare parameter.
