@@ -84,8 +84,8 @@ WHERE p.description ||| 'wireless'
 ORDER BY p.id
 LIMIT 5;
 WARNING:  JoinScan not used: join conditions must reference columnar indexed fields (tables: c, p, s)
-                                                                                                                QUERY PLAN                                                                                                                
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                                          QUERY PLAN                                                                                                          
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit
    Output: p.id, p.name, s.name, c.name
    ->  Sort
@@ -93,26 +93,26 @@ WARNING:  JoinScan not used: join conditions must reference columnar indexed fie
          Sort Key: p.id
          ->  Nested Loop
                Output: p.id, p.name, s.name, c.name
-               Join Filter: (c.id = p.category_id)
-               ->  Seq Scan on public.categories c
-                     Output: c.id, c.name, c.description
-               ->  Materialize
-                     Output: p.id, p.name, p.category_id, s.name
-                     ->  Hash Join
-                           Output: p.id, p.name, p.category_id, s.name
-                           Hash Cond: (s.id = p.supplier_id)
-                           ->  Seq Scan on public.suppliers s
-                                 Output: s.id, s.name, s.contact_info, s.country
-                           ->  Hash
-                                 Output: p.id, p.name, p.supplier_id, p.category_id
-                                 ->  Custom Scan (ParadeDB Base Scan) on public.products p
-                                       Output: p.id, p.name, p.supplier_id, p.category_id
-                                       Table: products
-                                       Index: products_bm25_idx
-                                       Worker Selection: Cost model
-                                       Exec Method: NormalScanExecState
-                                       Scores: false
-                                       Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"wireless","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
+               Inner Unique: true
+               Join Filter: (p.supplier_id = s.id)
+               ->  Nested Loop
+                     Output: p.id, p.name, p.supplier_id, c.name
+                     Inner Unique: true
+                     Join Filter: (c.id = p.category_id)
+                     ->  Custom Scan (ParadeDB Base Scan) on public.products p
+                           Output: p.id, p.name, p.supplier_id, p.category_id
+                           Table: products
+                           Index: products_bm25_idx
+                           Worker Selection: Cost model
+                           Exec Method: NormalScanExecState
+                           Scores: false
+                           Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"wireless","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
+                     ->  Materialize
+                           Output: c.name, c.id
+                           ->  Seq Scan on public.categories c
+                                 Output: c.name, c.id
+               ->  Seq Scan on public.suppliers s
+                     Output: s.id, s.name, s.contact_info, s.country
 (27 rows)
 
 SELECT p.id, p.name, s.name AS supplier_name, c.name AS category_name

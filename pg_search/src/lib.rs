@@ -81,8 +81,15 @@ const EXPENSIVE_QUERY_COST_FACTOR: f64 = 25.0;
 
 /// An arbitrary value for what it costs for a plan with one of our operators (@@@) to do whatever
 /// initial work it needs to do (open tantivy index, start the query, etc).  The value is largely
-/// meaningless but we should be honest that do _something_.
+/// meaningless but we should be honest that do _something_. What opening the index costs on top
+/// of it, per segment and per row of a mutable segment, is `postgres::cost::scan_startup_cost`.
 const DEFAULT_STARTUP_COST: f64 = 10.0;
+
+/// What a row of a mutable segment costs a reader before the reader can search it, in
+/// multiples of `cpu_tuple_cost`: the reader fetches the row from the heap, evaluates the index
+/// expressions on it and indexes it in memory. Ten tuple costs is the order of an index insert
+/// of the same row.
+const MUTABLE_ROW_COST_FACTOR: f64 = 10.0;
 
 /// Planning-time row estimate used when LIMIT is parameterized (resolved only at
 /// execution time). Substitutes for an unknown LIMIT in cost/cardinality math

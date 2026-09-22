@@ -334,20 +334,22 @@ FROM collation_test
 WHERE id @@@ paradedb.all()
 GROUP BY GROUPING SETS ((name_c), ());
 WARNING:  Aggregate Scan not used: GROUPING SETS are not supported. To disable this warning: SET paradedb.planner_warnings = 'off' (table: collation_test)
-                        QUERY PLAN                        
-----------------------------------------------------------
- MixedAggregate
-   Hash Key: name_c
+                           QUERY PLAN                           
+----------------------------------------------------------------
+ GroupAggregate
+   Group Key: name_c
    Group Key: ()
-   ->  Custom Scan (ParadeDB Base Scan) on collation_test
-         Table: collation_test
-         Index: collation_test_idx
-         Exec Method: ColumnarExecState
-         Columnar: name_c
-         Scores: false
-         Full Index Scan: true
-         Tantivy Query: {"with_index":{"query":"all"}}
-(11 rows)
+   ->  Sort
+         Sort Key: name_c COLLATE "C"
+         ->  Custom Scan (ParadeDB Base Scan) on collation_test
+               Table: collation_test
+               Index: collation_test_idx
+               Exec Method: ColumnarExecState
+               Columnar: name_c
+               Scores: false
+               Full Index Scan: true
+               Tantivy Query: {"with_index":{"query":"all"}}
+(13 rows)
 
 SELECT COUNT(*) AS group_count
 FROM (
@@ -668,10 +670,10 @@ WARNING:  JoinScan not used: ORDER BY columns must have a byte-ordered (C-like) 
  Limit
    ->  Sort
          Sort Key: p.name_icu COLLATE test_icu
-         ->  Hash Join
-               Hash Cond: (s.product_id = p.id)
+         ->  Nested Loop
+               Join Filter: (p.id = s.product_id)
                ->  Seq Scan on collation_join_suppliers s
-               ->  Hash
+               ->  Materialize
                      ->  Custom Scan (ParadeDB Base Scan) on collation_join_products p
                            Table: collation_join_products
                            Index: collation_join_products_idx

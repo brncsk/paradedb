@@ -767,13 +767,12 @@ WARNING:  JoinScan not used: join predicates must reference columnar indexed fie
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit
    Output: p.id, p.name, s.name
-   ->  Hash Join
+   ->  Nested Loop
          Output: p.id, p.name, s.name
-         Hash Cond: (s.id = p.supplier_id)
-         Join Filter: (p.category_id > s.id)
+         Join Filter: ((p.category_id > s.id) AND (p.supplier_id = s.id))
          ->  Seq Scan on public.suppliers s
                Output: s.name, s.id
-         ->  Hash
+         ->  Materialize
                Output: p.id, p.name, p.supplier_id, p.category_id
                ->  Custom Scan (ParadeDB Base Scan) on public.products p
                      Output: p.id, p.name, p.supplier_id, p.category_id
@@ -783,7 +782,7 @@ WARNING:  JoinScan not used: join predicates must reference columnar indexed fie
                      Exec Method: NormalScanExecState
                      Scores: false
                      Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"wireless","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
-(18 rows)
+(17 rows)
 
 -- =============================================================================
 -- TEST 12: Functions in cross-table predicates (native DF + UDF fallback)

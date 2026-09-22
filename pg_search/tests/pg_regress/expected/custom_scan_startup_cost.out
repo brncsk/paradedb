@@ -11,9 +11,7 @@ CREATE TABLE custom_scan_startup_cost (
     body text
 );
 CREATE INDEX custom_scan_startup_cost_idx
-ON custom_scan_startup_cost USING paradedb (id, ((category)::pdb.literal), body)
-WITH (key_field = 'id');
-WARNING:  key_field is deprecated as of 0.26.0 and is a no-op; it no longer needs to be provided
+ON custom_scan_startup_cost USING paradedb (id, ((category)::pdb.literal), body);
 INSERT INTO custom_scan_startup_cost
 SELECT g, 'c' || (g % 10), 'body ' || g FROM generate_series(1, 2000) g;
 ANALYZE custom_scan_startup_cost;

@@ -53,6 +53,7 @@ use crate::postgres::customscan::basescan::exec_methods::{
 };
 use crate::postgres::customscan::basescan::privdat::PrivateData;
 
+use crate::postgres::cost::scan_startup_cost;
 use crate::postgres::customscan::basescan::projections::snippet::{
     SnippetType, snippet_funcoids, snippet_positions_funcoids, snippets_funcoids, uses_snippets,
 };
@@ -101,8 +102,8 @@ use crate::query::SearchQueryInput;
 use crate::query::pdb_query::pdb;
 use crate::schema::SearchIndexSchema;
 use crate::vector::metric::VectorMetric;
-use crate::{DEFAULT_STARTUP_COST, PARAMETERIZED_SELECTIVITY, UNKNOWN_SELECTIVITY, nodecast};
 use crate::{FULL_RELATION_SELECTIVITY, UNASSIGNED_SELECTIVITY};
+use crate::{PARAMETERIZED_SELECTIVITY, UNKNOWN_SELECTIVITY, nodecast};
 
 use crate::postgres::customscan::limit_offset::LimitOffset;
 use pgrx::{FromDatum, IntoDatum, PgList, PgMemoryContexts, pg_sys};
@@ -1009,16 +1010,18 @@ impl CustomScan for BaseScan {
 
             // TODO(#6078): planner costing does not yet account for segment-statistics pruning;
             // execution may skip some of these segments.
-            let (segment_count, index_docs) = {
+            let (segment_count, index_docs, mutable_docs) = {
                 let directory = MvccSatisfies::LargestSegment.directory(&bm25_index);
                 // The counts are only valid after the index has been opened.
                 let segment_count = directory.total_segment_count();
                 let total_docs = directory.total_docs();
+                let mutable_docs = directory.total_mutable_docs();
                 crate::index::open_index(directory)
                     .expect("custom_scan: should be able to open index");
                 (
                     segment_count.load(Ordering::Relaxed),
                     total_docs.load(Ordering::Relaxed) as u64,
+                    mutable_docs.load(Ordering::Relaxed) as u64,
                 )
             };
             let schema = bm25_index
@@ -1206,8 +1209,8 @@ impl CustomScan for BaseScan {
             // to decide on parallelism
             //
 
-            let startup_cost =
-                DEFAULT_STARTUP_COST + harvested_bitmap.as_ref().map_or(0.0, |h| h.build_cost);
+            let startup_cost = scan_startup_cost(segment_count, mutable_docs)
+                + harvested_bitmap.as_ref().map_or(0.0, |h| h.build_cost);
             let mut custom_paths = Vec::new();
             let parallel_leader_participates = pg_sys::parallel_leader_participation;
             // Seed the cost memo from the open create_custom_path already did for selectivity (if

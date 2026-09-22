@@ -1,0 +1,47 @@
+-- The custom scan's startup cost was a flat value, less than two index probes,
+-- whatever the index looked like, so a nested loop that rescanned a search once
+-- per outer row looked cheap. The cost now charges the open of every segment and
+-- the materialization of the rows a mutable segment holds: the rows the
+-- transaction wrote, which a reader fetches from the heap, evaluates the index
+-- expressions on and indexes in memory before it can search them.
+
+CREATE EXTENSION IF NOT EXISTS pg_search;
+
+CREATE TABLE custom_scan_startup_cost (
+    id bigint PRIMARY KEY,
+    category text,
+    body text
+);
+CREATE INDEX custom_scan_startup_cost_idx
+ON custom_scan_startup_cost USING paradedb (id, ((category)::pdb.literal), body);
+INSERT INTO custom_scan_startup_cost
+SELECT g, 'c' || (g % 10), 'body ' || g FROM generate_series(1, 2000) g;
+ANALYZE custom_scan_startup_cost;
+
+-- The startup cost of the custom scan in the plan of `q`.
+CREATE FUNCTION custom_scan_startup_cost_of(q text) RETURNS numeric AS $$
+DECLARE plan jsonb;
+BEGIN
+  EXECUTE 'EXPLAIN (FORMAT JSON) ' || q INTO plan;
+  RETURN (jsonb_path_query_first(plan, 'strict $.** ? (@."Node Type" == "Custom Scan")."Startup Cost"'))::numeric;
+END $$ LANGUAGE plpgsql;
+
+-- Every segment costs a random page to open, over the base cost of the query.
+SELECT custom_scan_startup_cost_of(
+  $$SELECT * FROM custom_scan_startup_cost WHERE id @@@ paradedb.term('category', 'c1')$$
+) > 10 AS open_is_charged_per_segment;
+
+-- Rows pending in a mutable segment are charged per row.
+SELECT custom_scan_startup_cost_of(
+  $$SELECT * FROM custom_scan_startup_cost WHERE id @@@ paradedb.term('category', 'c1')$$
+) AS committed_cost \gset
+BEGIN;
+INSERT INTO custom_scan_startup_cost
+SELECT g, 'c' || (g % 10), 'body ' || g FROM generate_series(2001, 2500) g;
+SELECT custom_scan_startup_cost_of(
+  $$SELECT * FROM custom_scan_startup_cost WHERE id @@@ paradedb.term('category', 'c1')$$
+) - :committed_cost >= 40 AS pending_rows_are_charged;
+ROLLBACK;
+
+DROP FUNCTION custom_scan_startup_cost_of(text);
+DROP TABLE custom_scan_startup_cost;

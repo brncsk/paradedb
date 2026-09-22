@@ -15,8 +15,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{DEFAULT_STARTUP_COST, UNKNOWN_SELECTIVITY};
+use crate::index::mvcc::MvccSatisfies;
+use crate::postgres::rel::PgSearchRelation;
+use crate::{DEFAULT_STARTUP_COST, MUTABLE_ROW_COST_FACTOR, UNKNOWN_SELECTIVITY};
 use pgrx::*;
+use std::sync::atomic::Ordering;
+use tantivy::Index;
+
+/// What a scan of the index costs before its first row: [`DEFAULT_STARTUP_COST`] for the query,
+/// one random page per segment (a reader opens every segment's components through the buffer
+/// cache), and the rows of a mutable segment, which a reader fetches from the heap, evaluates
+/// the index expressions on and indexes in memory before it can search them. A path pays this on
+/// every rescan, so a nested loop with a search on its inner side is costed as the repeated
+/// opens it is.
+pub(crate) fn scan_startup_cost(segment_count: usize, mutable_docs: u64) -> f64 {
+    let random_page_cost = unsafe { *std::ptr::addr_of!(pg_sys::random_page_cost) };
+    let cpu_tuple_cost = unsafe { *std::ptr::addr_of!(pg_sys::cpu_tuple_cost) };
+    DEFAULT_STARTUP_COST
+        + segment_count as f64 * random_page_cost
+        + mutable_docs as f64 * MUTABLE_ROW_COST_FACTOR * cpu_tuple_cost
+}
+
+/// The segment count and the mutable segments' document count of the index, as
+/// [`scan_startup_cost`] wants them. Opens the index once.
+pub(crate) fn scan_startup_counts(indexrel: &PgSearchRelation) -> (usize, u64) {
+    let directory = MvccSatisfies::LargestSegment.directory(indexrel);
+    // The counts are only valid after the index has been opened.
+    let segment_count = directory.total_segment_count();
+    let mutable_docs = directory.total_mutable_docs();
+    Index::open(directory).expect("scan_startup_counts: should be able to open index");
+    (
+        segment_count.load(Ordering::Relaxed),
+        mutable_docs.load(Ordering::Relaxed) as u64,
+    )
+}
 
 #[allow(clippy::too_many_arguments)]
 #[pg_guard(immutable, parallel_safe)]
@@ -60,8 +92,16 @@ pub unsafe extern "C-unwind" fn amcostestimate(
     // we output rows in random order relative to the heap's ctid ordering
     *index_correlation = 0.0;
 
-    // it does cost a little bit for us to startup, which is spawning the tantivy query
-    *index_startup_cost = DEFAULT_STARTUP_COST;
+    // it does cost to start up: the tantivy query, and the open of every segment and of the
+    // rows a mutable segment holds, as for the custom scan
+    *index_startup_cost = {
+        let indexrel = PgSearchRelation::with_lock(
+            (*(*path).indexinfo).indexoid,
+            pg_sys::AccessShareLock as pg_sys::LOCKMODE,
+        );
+        let (segment_count, mutable_docs) = scan_startup_counts(&indexrel);
+        scan_startup_cost(segment_count, mutable_docs)
+    };
 
     // choose the smallest selectivity from the RestrictInfo clauses that have already done their estimations
     *index_selectivity = if index_clauses.is_empty() {

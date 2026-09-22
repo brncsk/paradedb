@@ -1,0 +1,5 @@
+---
+header: performance
+---
+
+The custom scan's startup cost was a flat value, less than two index probes, whatever the index looked like, so a nested loop that rescanned a search once per outer row looked cheap. The cost now charges the open of every segment and the materialization of the rows a mutable segment holds: the rows the transaction wrote, which a reader fetches from the heap, evaluates the index expressions on and indexes in memory before it can search them. The plain index scan path over the index is costed the same way.

@@ -408,6 +408,7 @@ pub struct MVCCDirectory {
     pin_cushion: Arc<Mutex<Option<PinCushion>>>,
     total_segment_count: Arc<AtomicUsize>,
     total_docs: Arc<AtomicUsize>,
+    total_mutable_docs: Arc<AtomicUsize>,
     heap_fetch_state: Arc<OnceLock<HeapFetchState>>,
     expression_state: Arc<OnceLock<ExpressionState>>,
 }
@@ -437,6 +438,7 @@ impl MVCCDirectory {
             all_entries: Default::default(),
             total_segment_count: Default::default(),
             total_docs: Default::default(),
+            total_mutable_docs: Default::default(),
             heap_fetch_state: Default::default(),
             expression_state: Default::default(),
         }
@@ -670,6 +672,12 @@ impl MVCCDirectory {
 
     pub(crate) fn total_docs(&self) -> Arc<AtomicUsize> {
         self.total_docs.clone()
+    }
+
+    /// The documents of the mutable segments, which a reader indexes in memory before it can
+    /// search them. Only valid after the index has been opened.
+    pub(crate) fn total_mutable_docs(&self) -> Arc<AtomicUsize> {
+        self.total_mutable_docs.clone()
     }
 }
 
@@ -955,12 +963,21 @@ impl Directory for MVCCDirectory {
                         }
                     }
 
+                    let total_mutable_docs = all_entries
+                        .values()
+                        .map(|entry| match entry {
+                            LoadedSegmentMetaEntry::Memory { meta, .. } => meta.num_docs(),
+                            LoadedSegmentMetaEntry::Persisted { .. } => 0,
+                        })
+                        .sum();
                     *self.all_entries.lock() = all_entries;
 
                     *self.pin_cushion.lock() = Some(loaded.pin_cushion);
                     self.total_segment_count
                         .store(loaded.total_segments, Ordering::Relaxed);
                     self.total_docs.store(loaded.total_docs, Ordering::Relaxed);
+                    self.total_mutable_docs
+                        .store(total_mutable_docs, Ordering::Relaxed);
                     Ok(loaded.meta)
                 }
             }

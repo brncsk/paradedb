@@ -256,12 +256,12 @@ LIMIT 10;
    ->  Sort
          Output: p.id, p.name, s.name
          Sort Key: p.id
-         ->  Hash Join
+         ->  Nested Loop
                Output: p.id, p.name, s.name
-               Hash Cond: (s.id = p.supplier_id)
+               Join Filter: (p.supplier_id = s.id)
                ->  Seq Scan on public.suppliers s
                      Output: s.id, s.name, s.contact_info, s.country
-               ->  Hash
+               ->  Materialize
                      Output: p.id, p.name, p.supplier_id
                      ->  Custom Scan (ParadeDB Base Scan) on public.products p
                            Output: p.id, p.name, p.supplier_id

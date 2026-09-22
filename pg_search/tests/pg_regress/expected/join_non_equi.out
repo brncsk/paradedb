@@ -829,30 +829,29 @@ WHERE i.description ||| 'ergonomic'
 ORDER BY i.id
 LIMIT 10;
 WARNING:  JoinScan not used: outer-join ON residual predicates are not supported (tables: i, o)
-                                                                                                          QUERY PLAN                                                                                                           
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                                       QUERY PLAN                                                                                                        
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit
    Output: i.id, i.name
    ->  Sort
          Output: i.id, i.name
          Sort Key: i.id
-         ->  Hash Right Anti Join
+         ->  Nested Loop Anti Join
                Output: i.id, i.name
-               Hash Cond: (o.target_category = i.category)
-               Join Filter: (i.unindexed_weight < (o.min_price)::double precision)
-               ->  Seq Scan on public.nonequi_offers o
-                     Output: o.id, o.promo_name, o.description, o.target_category, o.min_price, o.max_price, o.min_rating
-               ->  Hash
+               Join Filter: ((i.category = o.target_category) AND (i.unindexed_weight < (o.min_price)::double precision))
+               ->  Custom Scan (ParadeDB Base Scan) on public.nonequi_items i
                      Output: i.id, i.name, i.category, i.unindexed_weight
-                     ->  Custom Scan (ParadeDB Base Scan) on public.nonequi_items i
-                           Output: i.id, i.name, i.category, i.unindexed_weight
-                           Table: nonequi_items
-                           Index: nonequi_items_idx
-                           Worker Selection: Cost model
-                           Exec Method: NormalScanExecState
-                           Scores: false
-                           Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"ergonomic","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
-(21 rows)
+                     Table: nonequi_items
+                     Index: nonequi_items_idx
+                     Worker Selection: Cost model
+                     Exec Method: NormalScanExecState
+                     Scores: false
+                     Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"ergonomic","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
+               ->  Materialize
+                     Output: o.target_category, o.min_price
+                     ->  Seq Scan on public.nonequi_offers o
+                           Output: o.target_category, o.min_price
+(20 rows)
 
 SELECT i.id, i.name
 FROM nonequi_items i
