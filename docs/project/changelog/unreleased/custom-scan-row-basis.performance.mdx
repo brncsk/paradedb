@@ -1,0 +1,5 @@
+---
+header: performance
+---
+
+The custom scan estimated one row at a fixed cost for every query over a table without statistics (a table loaded after its index was created keeps `reltuples` at zero until it is analyzed), which put the scan on the inner side of nested loops that rescanned it once per outer row. The row basis now falls back to the index's own document count when the heap has no statistics.

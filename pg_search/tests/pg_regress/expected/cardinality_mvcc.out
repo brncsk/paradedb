@@ -109,7 +109,7 @@ ORDER BY id DESC LIMIT 1 OFFSET 0;
          Output: id, pdb.window_agg('{"entries":[{"Aggregate":{"Custom":{"agg_json":{"cardinality":{"field":"val"}},"filter":null,"indexrelid":0,"mvcc_visibility":"Transaction"}}}],"groupby":{"grouping_columns":[]},"uses_our_operator":false}'::text)
          Table: card_mvcc
          Index: idx_card_mvcc
-         Worker Selection: Row-capped
+         Worker Selection: Cost model
          Exec Method: TopKScanExecState
          Scores: false
             TopK Order By: id desc

@@ -35,7 +35,7 @@ WARNING:  Aggregate Scan not used: argument to aggregate function is neither a d
                      Output: paradedb.score(id), paradedb.score(id)
                      Table: mock_items
                      Index: search_idx
-                     Worker Selection: Row-capped
+                     Worker Selection: Cost model
                      Exec Method: NormalScanExecState
                      Scores: true
                      Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"keyboard","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
@@ -65,7 +65,7 @@ WARNING:  Aggregate Scan not used: argument to aggregate function is neither a d
                      Output: paradedb.score(id), paradedb.score(id)
                      Table: mock_items
                      Index: search_idx
-                     Worker Selection: Row-capped
+                     Worker Selection: Cost model
                      Exec Method: NormalScanExecState
                      Scores: true
                      Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"keyboard","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
@@ -95,7 +95,7 @@ WARNING:  Aggregate Scan not used: argument to aggregate function is neither a d
                      Output: paradedb.score(id), paradedb.score(id)
                      Table: mock_items
                      Index: search_idx
-                     Worker Selection: Row-capped
+                     Worker Selection: Cost model
                      Exec Method: NormalScanExecState
                      Scores: true
                      Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"keyboard","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
@@ -145,7 +145,7 @@ WARNING:  Aggregate Scan not used: argument to aggregate function is neither a d
                      Output: paradedb.score(id), paradedb.score(id)
                      Table: mock_items
                      Index: search_idx
-                     Worker Selection: Row-capped
+                     Worker Selection: Cost model
                      Exec Method: NormalScanExecState
                      Scores: true
                      Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"keyboard","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
@@ -172,7 +172,7 @@ WARNING:  Aggregate Scan not used: argument to aggregate function is neither a d
          Output: paradedb.score(id), paradedb.score(id)
          Table: mock_items
          Index: search_idx
-         Worker Selection: Row-capped
+         Worker Selection: Cost model
          Exec Method: NormalScanExecState
          Scores: true
          Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"keyboard","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
@@ -205,7 +205,7 @@ WARNING:  Aggregate Scan not used: argument to aggregate function is neither a d
                      Output: paradedb.score(id), paradedb.score(id), paradedb.score(id), paradedb.score(id), paradedb.score(id), paradedb.score(id)
                      Table: mock_items
                      Index: search_idx
-                     Worker Selection: Row-capped
+                     Worker Selection: Cost model
                      Exec Method: NormalScanExecState
                      Scores: true
                      Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"keyboard","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}

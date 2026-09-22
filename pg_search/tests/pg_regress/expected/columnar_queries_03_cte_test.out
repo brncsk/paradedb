@@ -107,8 +107,8 @@ FROM searchable_docs sd
 JOIN matching_files mf ON sd.id = mf.documentId
 JOIN relevant_pages rp ON mf.id = rp.fileId
 ORDER BY document_title, file_title, page_number;
-                                                                                                                                                                                                       QUERY PLAN                                                                                                                                                                                                       
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                                                                                                                                          QUERY PLAN                                                                                                                                                                                                          
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Sort
    Sort Key: sd.title, mf.title, p.page_number
    CTE searchable_docs
@@ -120,8 +120,8 @@ ORDER BY document_title, file_title, page_number;
            Scores: false
            Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"match":{"field":"title","value":"CTE Test","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"parents","value":"Reports","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}]}}
    CTE matching_files
-     ->  Nested Loop
-           Join Filter: (f.documentid = sd_1.id)
+     ->  Hash Join
+           Hash Cond: (f.documentid = sd_1.id)
            ->  Custom Scan (ParadeDB Base Scan) on files f
                  Table: files
                  Index: files_search
@@ -129,24 +129,27 @@ ORDER BY document_title, file_title, page_number;
                  Columnar: documentid, file_path, file_size, id, title
                  Scores: false
                  Tantivy Query: {"with_index":{"query":{"match":{"field":"title","value":"CTE Test","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
-           ->  CTE Scan on searchable_docs sd_1
+           ->  Hash
+                 ->  CTE Scan on searchable_docs sd_1
    ->  Nested Loop
-         Join Filter: (p.fileid = mf_1.id)
-         ->  Nested Loop
-               Join Filter: (mf.id = mf_1.id)
-               ->  Nested Loop
-                     Join Filter: (sd.id = mf.documentid)
-                     ->  CTE Scan on searchable_docs sd
-                     ->  CTE Scan on matching_files mf
-               ->  CTE Scan on matching_files mf_1
-         ->  Custom Scan (ParadeDB Base Scan) on pages p
-               Table: pages
-               Index: pages_search
-               Exec Method: ColumnarExecState
-               Columnar: fileid, page_number
-               Scores: false
-               Tantivy Query: {"boolean":{"should":[{"with_index":{"query":{"match":{"field":"content","value":"searchable","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"content","value":"testing","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}]}}
-(37 rows)
+         Join Filter: (sd.id = mf.documentid)
+         ->  Hash Join
+               Hash Cond: (p.fileid = mf_1.id)
+               ->  Custom Scan (ParadeDB Base Scan) on pages p
+                     Table: pages
+                     Index: pages_search
+                     Exec Method: ColumnarExecState
+                     Columnar: fileid, page_number
+                     Scores: false
+                     Tantivy Query: {"boolean":{"should":[{"with_index":{"query":{"match":{"field":"content","value":"searchable","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"content","value":"testing","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}]}}
+               ->  Hash
+                     ->  Hash Join
+                           Hash Cond: (mf.id = mf_1.id)
+                           ->  CTE Scan on matching_files mf
+                           ->  Hash
+                                 ->  CTE Scan on matching_files mf_1
+         ->  CTE Scan on searchable_docs sd
+(40 rows)
 
 -- Test with CTE
 WITH searchable_docs AS (

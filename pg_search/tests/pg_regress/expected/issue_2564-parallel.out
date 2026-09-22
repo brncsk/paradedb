@@ -93,36 +93,36 @@ WHERE d.parents ||| 'Factures'
   AND p.content ||| 'Socienty'
 ORDER BY d.id, f.id, p.id;
 WARNING:  JoinScan not used: LIMIT is required for top-level queries (tables: d, f, p)
-                                                                                                           QUERY PLAN                                                                                                           
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                                              QUERY PLAN                                                                                                              
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Gather Merge
    Workers Planned: 1
    ->  Sort
          Sort Key: d.id, p.fileid, p.id
          ->  Parallel Hash Join
-               Hash Cond: (f.id = p.fileid)
-               ->  Parallel Hash Join
-                     Hash Cond: (f.documentid = d.id)
-                     ->  Parallel Custom Scan (ParadeDB Base Scan) on files f
-                           Table: files
-                           Index: files_search
-                           Exec Method: NormalScanExecState
-                           Scores: false
-                           Tantivy Query: {"with_index":{"query":{"match":{"field":"title","value":"Receipt","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
-                     ->  Parallel Hash
-                           ->  Parallel Custom Scan (ParadeDB Base Scan) on documents d
-                                 Table: documents
-                                 Index: documents_search
+               Hash Cond: (p.fileid = f.id)
+               ->  Parallel Custom Scan (ParadeDB Base Scan) on pages p
+                     Table: pages
+                     Index: pages_search
+                     Exec Method: NormalScanExecState
+                     Scores: false
+                     Tantivy Query: {"with_index":{"query":{"match":{"field":"content","value":"Socienty","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
+               ->  Parallel Hash
+                     ->  Parallel Hash Join
+                           Hash Cond: (f.documentid = d.id)
+                           ->  Parallel Custom Scan (ParadeDB Base Scan) on files f
+                                 Table: files
+                                 Index: files_search
                                  Exec Method: NormalScanExecState
                                  Scores: false
-                                 Tantivy Query: {"with_index":{"query":{"match":{"field":"parents","value":"Factures","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
-               ->  Parallel Hash
-                     ->  Parallel Custom Scan (ParadeDB Base Scan) on pages p
-                           Table: pages
-                           Index: pages_search
-                           Exec Method: NormalScanExecState
-                           Scores: false
-                           Tantivy Query: {"with_index":{"query":{"match":{"field":"content","value":"Socienty","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
+                                 Tantivy Query: {"with_index":{"query":{"match":{"field":"title","value":"Receipt","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
+                           ->  Parallel Hash
+                                 ->  Parallel Custom Scan (ParadeDB Base Scan) on documents d
+                                       Table: documents
+                                       Index: documents_search
+                                       Exec Method: NormalScanExecState
+                                       Scores: false
+                                       Tantivy Query: {"with_index":{"query":{"match":{"field":"parents","value":"Factures","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
 (28 rows)
 
 SELECT d.id, d.parents, f.title, f.file_path, p.fileId, p.page_number
@@ -151,32 +151,27 @@ EXPLAIN (COSTS OFF) SELECT d.id, d.title, d.parents,
 FROM documents d
 WHERE d.parents ||| 'Factures'
 ORDER BY d.id;
-                                                                                                                                                                                                      QUERY PLAN                                                                                                                                                                                                       
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Gather Merge
-   Workers Planned: 1
-   ->  Sort
-         Sort Key: d.id
-         ->  Parallel Custom Scan (ParadeDB Base Scan) on documents d
-               Table: documents
-               Index: documents_search
-               Exec Method: NormalScanExecState
-               Scores: false
-               Tantivy Query: {"with_index":{"query":{"match":{"field":"parents","value":"Factures","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
-   SubPlan 1
-     ->  Limit
-           ->  Custom Scan (ParadeDB Base Scan) on files f
-                 Table: files
-                 Index: files_search
-                 Bitmap Intersection: files_pkey
-                 Exec Method: TopKScanExecState
-                 Scores: true
-                    TopK Order By: pdb.score() desc
-                    TopK Limit: 1
-                 Tantivy Query: {"boolean":{"must":[{"heap_filter":{"indexed_query":{"boolean":{"must":[{"with_index":{"query":{"match":{"field":"title","value":"Invoice","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}]}},"always_filters":[],"recheck_filters":[{"heap_filter":"(documentid = $1)"}],"uses_tid_bitmap":true,"bitmap_consumer_id":0}}]}}
-                 ->  Bitmap Index Scan on files_pkey
-                       Index Cond: (documentid = d.id)
-(23 rows)
+                                                                                                                                                                        QUERY PLAN                                                                                                                                                                        
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Sort Key: d.id
+   ->  Custom Scan (ParadeDB Base Scan) on documents d
+         Table: documents
+         Index: documents_search
+         Exec Method: NormalScanExecState
+         Scores: false
+         Tantivy Query: {"with_index":{"query":{"match":{"field":"parents","value":"Factures","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
+         SubPlan 1
+           ->  Limit
+                 ->  Custom Scan (ParadeDB Base Scan) on files f
+                       Table: files
+                       Index: files_search
+                       Exec Method: TopKScanExecState
+                       Scores: true
+                          TopK Order By: pdb.score() desc
+                          TopK Limit: 1
+                       Tantivy Query: {"boolean":{"must":[{"heap_filter":{"indexed_query":{"boolean":{"must":[{"with_index":{"query":{"match":{"field":"title","value":"Invoice","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}]}},"always_filters":[{"heap_filter":"(documentid = $1)"}]}}]}}
+(18 rows)
 
 SELECT d.id, d.title, d.parents,
        (

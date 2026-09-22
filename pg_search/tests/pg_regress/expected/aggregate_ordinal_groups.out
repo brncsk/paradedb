@@ -121,7 +121,7 @@ ORDER BY category;
                Output: category, price
                Table: aog_products
                Index: aog_products_idx
-               Worker Selection: Row-capped
+               Worker Selection: Cost model
                Exec Method: ColumnarExecState
                Columnar: category, price
                Scores: false
@@ -299,7 +299,7 @@ ORDER BY p.category;
                            Output: p.category, p.id
                            Table: aog_products
                            Index: aog_products_idx
-                           Worker Selection: Row-capped
+                           Worker Selection: Cost model
                            Exec Method: ColumnarExecState
                            Columnar: category, id
                            Scores: false

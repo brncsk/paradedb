@@ -53,7 +53,7 @@ LIMIT 100;
          Output: items.id, items.status, items.created_at
          Table: items
          Index: items_idx
-         Worker Selection: Row-capped
+         Worker Selection: Per-segment
          Exec Method: TopKScanExecState
          Scores: false
             TopK Order By: created_at desc, id desc

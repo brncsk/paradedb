@@ -1009,12 +1009,17 @@ impl CustomScan for BaseScan {
 
             // TODO(#6078): planner costing does not yet account for segment-statistics pruning;
             // execution may skip some of these segments.
-            let segment_count = {
+            let (segment_count, index_docs) = {
                 let directory = MvccSatisfies::LargestSegment.directory(&bm25_index);
-                let segment_count = directory.total_segment_count(); // return value only valid after the index has been opened
+                // The counts are only valid after the index has been opened.
+                let segment_count = directory.total_segment_count();
+                let total_docs = directory.total_docs();
                 crate::index::open_index(directory)
                     .expect("custom_scan: should be able to open index");
-                segment_count.load(Ordering::Relaxed)
+                (
+                    segment_count.load(Ordering::Relaxed),
+                    total_docs.load(Ordering::Relaxed) as u64,
+                )
             };
             let schema = bm25_index
                 .schema()
@@ -1155,15 +1160,20 @@ impl CustomScan for BaseScan {
             // rows that we expect that scan to return: these may be different in the case of a
             // `limit`.
             //
-            // Use RowEstimate enum to distinguish between known and unknown row counts.
-            // Unknown is used when the table hasn't been ANALYZEd.
-            // TODO: Convert to use RowEstimate::from_reltuples.
-            let row_estimate = match table.reltuples() {
-                Some(reltuples) if reltuples > 0.0 => {
-                    let estimated = (reltuples as f64 * selectivity).max(1.0) as u64;
-                    RowEstimate::Known(estimated)
-                }
-                _ => RowEstimate::Unknown,
+            // The heap's `reltuples` is the row basis, and the index's own document count
+            // stands in for it while the heap has no statistics: a table loaded after its
+            // index was created keeps `reltuples` at zero until it is analyzed, and every
+            // path over it used to be costed as one row whatever the query, which put a
+            // search scan on the inner side of nested loops that rescanned it per outer row.
+            // `RowEstimate::Unknown` is left for an index with no documents either.
+            let total_rows = table
+                .reltuples()
+                .filter(|reltuples| *reltuples > 0.0)
+                .map(|reltuples| reltuples as f64)
+                .or_else(|| (index_docs > 0).then_some(index_docs as f64));
+            let row_estimate = match total_rows {
+                Some(total_rows) => RowEstimate::Known((total_rows * selectivity).max(1.0) as u64),
+                None => RowEstimate::Unknown,
             };
             let base_result_rows = match row_estimate.known_rows() {
                 Some(rows) => rows.min(float_limit.unwrap_or(f64::MAX)),
