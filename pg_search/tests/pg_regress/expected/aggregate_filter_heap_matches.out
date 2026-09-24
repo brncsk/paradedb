@@ -1,0 +1,86 @@
+-- =====================================================================
+-- An aggregate's FILTER reads the heap for the scan's matches only
+-- =====================================================================
+-- A `FILTER` clause the index cannot answer becomes a heap filter. Its
+-- own query was `all`, so the filter read the heap for every document of
+-- the index, although the aggregation only visits the documents the scan
+-- matches. The scan's query now takes the place of that `all`.
+CREATE EXTENSION IF NOT EXISTS pg_search;
+DROP TABLE IF EXISTS agg_filter_heap_matches;
+CREATE TABLE agg_filter_heap_matches (
+    id SERIAL PRIMARY KEY,
+    description TEXT,
+    payload TEXT,
+    bucket INT
+);
+INSERT INTO agg_filter_heap_matches (description, payload, bucket)
+SELECT CASE WHEN i % 2 = 0 THEN 'keeper' ELSE 'other' END,
+       'row ' || i,
+       i % 3
+FROM generate_series(1, 20) i;
+-- `payload` is not indexed, so a predicate on it is a heap filter.
+CREATE INDEX idx_agg_filter_heap_matches ON agg_filter_heap_matches
+USING paradedb (id, description, bucket);
+-- Test 1: the FILTER's heap filter runs over the scan's query, not over `all`
+EXPLAIN (COSTS OFF) SELECT count(*) FILTER (WHERE payload LIKE 'row 1%')
+FROM agg_filter_heap_matches WHERE description @@@ 'keeper';
+                                                                                                                                                                  QUERY PLAN                                                                                                                                                                   
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Custom Scan (ParadeDB Aggregate Scan) on agg_filter_heap_matches
+   Index: idx_agg_filter_heap_matches
+   Tantivy Query: {"with_index":{"query":{"parse_with_field":{"field":"description","query_string":"keeper","lenient":null,"conjunction_mode":null}}}}
+     Applies to Aggregates: COUNT(*)
+     Aggregate Definition: {"0":{"aggs":{"0":{"filter":"*"}},"filter":{"query":{"heap_filter":{"always_filters":[{"heap_filter":"(payload ~~ 'row 1%'::text)"}],"indexed_query":{"with_index":{"query":{"parse_with_field":{"conjunction_mode":null,"field":"description","lenient":null,"query_string":"keeper"}}}}}},"type":"FilterQuery"}}}
+(5 rows)
+
+SELECT count(*) FILTER (WHERE payload LIKE 'row 1%')
+FROM agg_filter_heap_matches WHERE description @@@ 'keeper';
+ count 
+-------
+     5
+(1 row)
+
+-- Test 2: the same count with the aggregate scan off
+SET paradedb.enable_aggregate_custom_scan = off;
+SELECT count(*) FILTER (WHERE payload LIKE 'row 1%')
+FROM agg_filter_heap_matches WHERE description @@@ 'keeper';
+ count 
+-------
+     5
+(1 row)
+
+RESET paradedb.enable_aggregate_custom_scan;
+-- Test 3: grouped, where the FILTER sits under the groups
+EXPLAIN (COSTS OFF) SELECT bucket, count(*) FILTER (WHERE payload LIKE 'row 1%')
+FROM agg_filter_heap_matches WHERE description @@@ 'keeper' GROUP BY 1 ORDER BY 1;
+                                                                                                                                                                                                                                                                                                                                                                                          QUERY PLAN                                                                                                                                                                                                                                                                                                                                                                                          
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Custom Scan (ParadeDB Aggregate Scan) on agg_filter_heap_matches
+   Index: idx_agg_filter_heap_matches
+   Tantivy Query: {"with_index":{"query":{"parse_with_field":{"field":"description","query_string":"keeper","lenient":null,"conjunction_mode":null}}}}
+     Applies to Aggregates: COUNT(*)
+     Group By: bucket
+     Aggregate Definition: {"0":{"aggs":{"grouped":{"aggs":{"0":{"filter":"*"}},"terms":{"field":"bucket","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"filter":{"query":{"heap_filter":{"always_filters":[{"heap_filter":"(payload ~~ 'row 1%'::text)"}],"indexed_query":{"with_index":{"query":{"parse_with_field":{"conjunction_mode":null,"field":"description","lenient":null,"query_string":"keeper"}}}}}},"type":"FilterQuery"}},"filter_sentinel":{"aggs":{"grouped":{"aggs":{"0":{"filter":"*"}},"terms":{"field":"bucket","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"filter":{"query":{"with_index":{"query":{"parse_with_field":{"conjunction_mode":null,"field":"description","lenient":null,"query_string":"keeper"}}}},"type":"FilterQuery"}}}
+(6 rows)
+
+SELECT bucket, count(*) FILTER (WHERE payload LIKE 'row 1%')
+FROM agg_filter_heap_matches WHERE description @@@ 'keeper' GROUP BY 1 ORDER BY 1;
+ bucket | count 
+--------+-------
+      0 |     2
+      1 |     2
+      2 |     1
+(3 rows)
+
+SET paradedb.enable_aggregate_custom_scan = off;
+SELECT bucket, count(*) FILTER (WHERE payload LIKE 'row 1%')
+FROM agg_filter_heap_matches WHERE description @@@ 'keeper' GROUP BY 1 ORDER BY 1;
+ bucket | count 
+--------+-------
+      0 |     2
+      1 |     2
+      2 |     1
+(3 rows)
+
+RESET paradedb.enable_aggregate_custom_scan;
+DROP TABLE agg_filter_heap_matches;

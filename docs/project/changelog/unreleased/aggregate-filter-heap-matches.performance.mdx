@@ -1,0 +1,5 @@
+---
+header: performance
+---
+
+An aggregate's `FILTER` clause that the index cannot answer now reads the heap for the documents the scan matches, not for every document of the index. `count(*) FILTER (WHERE <heap predicate>)` beside a search query fetched the whole table row by row, which took 12 seconds over 430,000 documents where the same count takes milliseconds with the aggregate scan off. The scan's query now stands where the filter carried `all`; the aggregation intersects the two either way, so the result does not change.

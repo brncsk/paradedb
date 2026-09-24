@@ -296,6 +296,41 @@ impl AggregateCSClause {
             .any(|agg| agg.filter_expr().is_some())
     }
 
+    /// A `FILTER` clause the index cannot answer becomes a heap filter over
+    /// `all`, which reads the heap for every document of the index, although the
+    /// aggregation only visits the documents the scan matches. The scan's query
+    /// takes the place of that `all`, so the filter reads those rows alone. The
+    /// aggregation intersects the two either way, so the result does not change.
+    ///
+    /// A scan query that is itself a heap filter over `all` has nothing to
+    /// narrow to, and is left alone.
+    fn filter_over_scan_matches(&self, mut filter: SearchQueryInput) -> SearchQueryInput {
+        fn filters_the_whole_index(query: &SearchQueryInput) -> bool {
+            let mut found = false;
+            query.visit_ref(&mut |node| {
+                if let SearchQueryInput::HeapFilter { indexed_query, .. } = node
+                    && matches!(**indexed_query, SearchQueryInput::All)
+                {
+                    found = true;
+                }
+            });
+            found
+        }
+
+        let scan = self.quals.query();
+        if !filters_the_whole_index(&filter) || filters_the_whole_index(scan) {
+            return filter;
+        }
+        filter.visit(&mut |node| {
+            if let SearchQueryInput::HeapFilter { indexed_query, .. } = node
+                && matches!(**indexed_query, SearchQueryInput::All)
+            {
+                **indexed_query = scan.clone();
+            }
+        });
+        filter
+    }
+
     pub fn has_orderby(&self) -> bool {
         self.orderby.has_orderby()
     }
@@ -755,9 +790,10 @@ impl CollectFlat<AggregateType, MetricsWithGroupBy> for AggregateCSClause {
 impl CollectFlat<Option<FilterQuery>, FiltersWithoutGroupBy> for AggregateCSClause {
     fn iter_leaves(&self) -> Result<impl Iterator<Item = Option<FilterQuery>>> {
         Ok(self.targetlist.aggregates().map(|agg| {
-            agg.filter_expr()
-                .as_ref()
-                .map(|q| new_filter_query(q.clone(), agg.indexrelid()).expect("filter query"))
+            agg.filter_expr().as_ref().map(|q| {
+                new_filter_query(self.filter_over_scan_matches(q.clone()), agg.indexrelid())
+                    .expect("filter query")
+            })
         }))
     }
 }
@@ -766,7 +802,7 @@ impl CollectFlat<FilterQuery, FiltersWithGroupBy> for AggregateCSClause {
     fn iter_leaves(&self) -> Result<impl Iterator<Item = FilterQuery>> {
         Ok(self.targetlist.aggregates().map(|agg| {
             let query = match agg.filter_expr() {
-                Some(q) => q.clone(),
+                Some(q) => self.filter_over_scan_matches(q.clone()),
                 None => SearchQueryInput::All,
             };
             new_filter_query(query, agg.indexrelid()).expect("filter query")
