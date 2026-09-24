@@ -140,15 +140,20 @@ impl AggregateType {
             None
         } else {
             let context = PlannerContext::from_planner(root);
-            extract_quals(
-                &context,
-                heap_rti,
-                (*aggref).aggfilter as *mut pg_sys::Node,
-                RestrictInfoType::BaseRelation,
-                bm25_index,
-                false,
-                qual_state,
-                true,
+            // A FILTER the scan cannot evaluate declines the scan, and Postgres runs the
+            // aggregate: aggregating without it would count the rows it excludes.
+            Some(
+                extract_quals(
+                    &context,
+                    heap_rti,
+                    (*aggref).aggfilter as *mut pg_sys::Node,
+                    RestrictInfoType::BaseRelation,
+                    bm25_index,
+                    false,
+                    qual_state,
+                    true,
+                )
+                .context("the aggregate's FILTER cannot be pushed down")?,
             )
         };
         // SECURITY: PostgreSQL evaluates FILTER after RLS; as a heap filter it would run first.

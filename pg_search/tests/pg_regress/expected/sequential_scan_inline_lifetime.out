@@ -29,7 +29,7 @@ SELECT count(*) FILTER (
 FROM inline_matcher_lifetime;
 BEGIN;
 EXECUTE inline_lifetime_lookup('allowed_suffix');
-WARNING:  Aggregate Scan not used: query does not imply the partial index predicate. To disable this warning: SET paradedb.planner_warnings = 'off' (table: inline_matcher_lifetime)
+WARNING:  Aggregate Scan not used: the aggregate's FILTER cannot be pushed down. To disable this warning: SET paradedb.planner_warnings = 'off' (table: inline_matcher_lifetime)
  mismatches 
 ------------
           0
@@ -59,7 +59,7 @@ EXECUTE inline_lifetime_lookup('allowed_suffix');
 
 DISCARD PLANS;
 EXECUTE inline_lifetime_lookup('denied_suffix');
-WARNING:  Aggregate Scan not used: query does not imply the partial index predicate. To disable this warning: SET paradedb.planner_warnings = 'off' (table: inline_matcher_lifetime)
+WARNING:  Aggregate Scan not used: the aggregate's FILTER cannot be pushed down. To disable this warning: SET paradedb.planner_warnings = 'off' (table: inline_matcher_lifetime)
  mismatches 
 ------------
           0

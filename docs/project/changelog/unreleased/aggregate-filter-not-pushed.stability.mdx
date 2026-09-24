@@ -1,0 +1,5 @@
+---
+header: stability
+---
+
+An aggregate whose `FILTER` clause the aggregate scan could not turn into a search query or a heap filter, such as `count(*) FILTER (WHERE a > b)`, was aggregated without the clause, counting the rows it excludes. The aggregate scan now declines such a query, and Postgres runs the aggregate.

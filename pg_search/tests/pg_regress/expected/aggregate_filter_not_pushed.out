@@ -50,13 +50,13 @@ WARNING:  Aggregate Scan not used: the aggregate's FILTER cannot be pushed down.
 
 -- Test 3: a FILTER the scan can evaluate is still pushed down
 EXPLAIN (COSTS OFF) SELECT count(*) FILTER (WHERE a = 3) FROM agg_filter_not_pushed WHERE description @@@ 'item';
-                                                                               QUERY PLAN                                                                                
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                     QUERY PLAN                                                                      
+-----------------------------------------------------------------------------------------------------------------------------------------------------
  Custom Scan (ParadeDB Aggregate Scan) on agg_filter_not_pushed
    Index: idx_agg_filter_not_pushed
    Tantivy Query: {"with_index":{"query":{"parse_with_field":{"field":"description","query_string":"item","lenient":null,"conjunction_mode":null}}}}
      Applies to Aggregates: COUNT(*)
-     Aggregate Definition: {"0":{"aggs":{"0":{"value_count":{"field":"ctid","missing":null}}},"filter":{"query":{"term":{"field":"a","value":3}},"type":"FilterQuery"}}}
+     Aggregate Definition: {"0":{"aggs":{"0":{"filter":"*"}},"filter":{"query":{"term":{"field":"a","value":3}},"type":"FilterQuery"}}}
 (5 rows)
 
 SELECT count(*) FILTER (WHERE a = 3) FROM agg_filter_not_pushed WHERE description @@@ 'item';
