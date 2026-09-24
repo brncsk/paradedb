@@ -526,13 +526,12 @@ pub unsafe fn find_one_var_and_fieldname(
 ) -> Option<(*mut pg_sys::Var, FieldName)> {
     if is_a(node, T_OpExpr) {
         let opexpr = node.cast::<OpExpr>();
-        static JSON_OPERATOR_LOOKUP: OnceLock<HashSet<pg_sys::Oid>> = OnceLock::new();
-        if JSON_OPERATOR_LOOKUP
-            .get_or_init(|| initialize_json_operator_lookup())
-            .contains(&(*opexpr).opno)
-        {
+        if is_json_path_operator((*opexpr).opno) {
             let var = node.find_single_node::<pg_sys::Var>()?;
             let path = find_json_path(&context, node);
+            if path.is_empty() {
+                return None;
+            }
             return Some((var, path.join(".").into()));
         }
         None
@@ -540,6 +539,9 @@ pub unsafe fn find_one_var_and_fieldname(
         // Handle PostgreSQL 14+ bracket notation: json['key']
         let var = node.find_single_node::<pg_sys::Var>()?;
         let path = find_json_path(&context, node);
+        if path.is_empty() {
+            return None;
+        }
         Some((var, path.join(".").into()))
     } else if is_a(node, T_Var) {
         let var = node.cast::<Var>();
@@ -559,23 +561,35 @@ pub unsafe fn find_one_var_and_fieldname(
 }
 
 /// Given a [`pg_sys::Node`] and a [`pg_sys::PlannerInfo`], attempt to find the JSON path that the
-/// node references.
+/// node references: a column, then the keys that the JSON path operators (`->`, `->>`, `#>`, `#>>`)
+/// or a subscript take from it, in order.
 ///
-/// It is the caller's responsibility to ensure that the node is a JSON path expression.
-#[inline(always)]
+/// Returns an empty path when the node is not such an expression. The operand of a JSON path
+/// operator must itself be a column or a JSON path: any other expression changes the value the
+/// keys are taken from, so `(json_field - 'a') ? 'b'` does not test `json_field.b`, and a
+/// constant argument of such an expression is never a key.
 pub unsafe fn find_json_path(context: &VarContext, node: *mut pg_sys::Node) -> Vec<String> {
-    let mut path = Vec::new();
+    json_path(context, node).unwrap_or_default()
+}
 
+/// Whether the operator is one of the JSON path operators: `->`, `->>`, `#>` or `#>>`.
+pub unsafe fn is_json_path_operator(opno: pg_sys::Oid) -> bool {
+    static JSON_OPERATOR_LOOKUP: OnceLock<HashSet<pg_sys::Oid>> = OnceLock::new();
+    JSON_OPERATOR_LOOKUP
+        .get_or_init(|| initialize_json_operator_lookup())
+        .contains(&opno)
+}
+
+/// The JSON path of a node, or `None` when the node is not a column followed by JSON path steps.
+unsafe fn json_path(context: &VarContext, node: *mut pg_sys::Node) -> Option<Vec<String>> {
     if is_a(node, T_Var) {
         let node = node as *mut Var;
         let (heaprelid, varattno) = context.var_relation(node);
-        // Return empty path if we can't get a valid field name (e.g., due to out-of-bounds varno)
-        if let Some(field_name) = fieldname_from_var(heaprelid, node, varattno) {
-            path.push(field_name.root());
-        }
-        return path;
+        let field_name = fieldname_from_var(heaprelid, node, varattno)?;
+        Some(vec![field_name.root()])
     } else if is_a(node, T_Const) {
         let node = node as *mut Const;
+        let mut path = Vec::new();
         if let PgOid::BuiltIn(oid) = PgOid::from((*node).consttype) {
             match oid {
                 pg_sys::BuiltinOid::TEXTOID | pg_sys::BuiltinOid::VARCHAROID => {
@@ -593,23 +607,28 @@ pub unsafe fn find_json_path(context: &VarContext, node: *mut pg_sys::Node) -> V
                 _ => {}
             }
         }
-
-        return path;
+        Some(path)
     } else if is_a(node, T_OpExpr) {
         let node = node as *mut OpExpr;
-        for expr in PgList::from_pg((*node).args).iter_ptr() {
-            path.extend(find_json_path(context, expr));
+        if !is_json_path_operator((*node).opno) {
+            return None;
         }
+        let mut path = Vec::new();
+        for expr in PgList::from_pg((*node).args).iter_ptr() {
+            path.extend(json_path(context, expr)?);
+        }
+        Some(path)
     } else if is_a(node, pg_sys::NodeTag::T_SubscriptingRef) {
         let node = node as *mut pg_sys::SubscriptingRef;
         // Extract container and subscript expressions for bracket notation
-        path.extend(find_json_path(context, (*node).refexpr.cast()));
+        let mut path = json_path(context, (*node).refexpr.cast())?;
         for expr in PgList::from_pg((*node).refupperindexpr).iter_ptr() {
-            path.extend(find_json_path(context, expr));
+            path.extend(json_path(context, expr)?);
         }
+        Some(path)
+    } else {
+        None
     }
-
-    path
 }
 
 #[inline(always)]

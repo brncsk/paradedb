@@ -1,0 +1,122 @@
+-- =====================================================================
+-- A JSON operator applied to an expression over a JSON column is not
+-- pushed down as if it applied to the column
+-- =====================================================================
+-- `(data - 'salary') ? 'salary'` asks whether the value the expression
+-- returns has the key, and it never has it. The pushdown used to find the
+-- column inside the expression and test the index's copy of the column
+-- instead, and it took a constant array argument of the expression for
+-- keys of the path. A view that removes keys from a column, to hide them
+-- from its readers, then answered a filter on a removed key from the
+-- index.
+CREATE EXTENSION IF NOT EXISTS pg_search;
+DROP TABLE IF EXISTS json_path_expr CASCADE;
+CREATE TABLE json_path_expr (
+    id SERIAL PRIMARY KEY,
+    description TEXT,
+    data JSONB
+);
+INSERT INTO json_path_expr (description, data) VALUES
+    ('Engineer', '{"name": "Ann", "salary": 100, "team": {"name": "core"}}'),
+    ('Engineer', '{"name": "Bob", "salary": 200}'),
+    ('Manager', '{"name": "Cid"}');
+CREATE INDEX idx_json_path_expr ON json_path_expr USING paradedb (id, description, (data::pdb.literal));
+-- A view that hides a key from its readers.
+CREATE VIEW json_path_expr_public AS
+SELECT id, description, data - 'salary' AS data FROM json_path_expr;
+-- Test 1: an exists test on the removed key matches nothing, and is not a term on data.salary
+EXPLAIN (COSTS OFF) SELECT id FROM json_path_expr_public WHERE description @@@ 'engineer' AND data ? 'salary' ORDER BY id;
+                                                                                                                                                          QUERY PLAN                                                                                                                                                           
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Sort Key: json_path_expr.id
+   ->  Custom Scan (ParadeDB Base Scan) on json_path_expr
+         Table: json_path_expr
+         Index: idx_json_path_expr
+         Exec Method: NormalScanExecState
+         Scores: false
+         Tantivy Query: {"boolean":{"must":[{"heap_filter":{"indexed_query":{"boolean":{"must":[{"with_index":{"query":{"parse_with_field":{"field":"description","query_string":"engineer","lenient":null,"conjunction_mode":null}}}}]}},"always_filters":[{"heap_filter":"((data - 'salary'::text) ? 'salary'::text)"}]}}]}}
+(8 rows)
+
+SELECT id FROM json_path_expr_public WHERE description @@@ 'engineer' AND data ? 'salary' ORDER BY id;
+ id 
+----
+(0 rows)
+
+-- Test 2: a comparison on the removed key matches nothing
+EXPLAIN (COSTS OFF) SELECT id FROM json_path_expr_public WHERE description @@@ 'engineer' AND (data->>'salary')::int > 150 ORDER BY id;
+                                                                                                                                                                     QUERY PLAN                                                                                                                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Sort Key: json_path_expr.id
+   ->  Custom Scan (ParadeDB Base Scan) on json_path_expr
+         Table: json_path_expr
+         Index: idx_json_path_expr
+         Exec Method: NormalScanExecState
+         Scores: false
+         Tantivy Query: {"boolean":{"must":[{"heap_filter":{"indexed_query":{"boolean":{"must":[{"with_index":{"query":{"parse_with_field":{"field":"description","query_string":"engineer","lenient":null,"conjunction_mode":null}}}}]}},"always_filters":[{"heap_filter":"((((data - 'salary'::text) ->> 'salary'::text))::integer > 150)"}]}}]}}
+(8 rows)
+
+SELECT id FROM json_path_expr_public WHERE description @@@ 'engineer' AND (data->>'salary')::int > 150 ORDER BY id;
+ id 
+----
+(0 rows)
+
+-- Test 3: a constant array argument of the expression is not a key of the path
+SELECT id FROM json_path_expr WHERE description @@@ 'engineer' AND (data - '{team}'::text[]) ? 'name' ORDER BY id;
+ id 
+----
+  1
+  2
+(2 rows)
+
+SELECT id FROM json_path_expr WHERE description @@@ 'engineer' AND (data - '{team}'::text[]) -> 'name' IS NOT NULL ORDER BY id;
+ id 
+----
+  1
+  2
+(2 rows)
+
+-- Test 4: the JSON path operators still push down
+EXPLAIN (COSTS OFF) SELECT id FROM json_path_expr WHERE description @@@ 'engineer' AND data ? 'salary' ORDER BY id;
+                                                                                                       QUERY PLAN                                                                                                        
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Sort Key: id
+   ->  Custom Scan (ParadeDB Base Scan) on json_path_expr
+         Table: json_path_expr
+         Index: idx_json_path_expr
+         Exec Method: ColumnarExecState
+         Columnar: id
+         Scores: false
+         Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"parse_with_field":{"field":"description","query_string":"engineer","lenient":null,"conjunction_mode":null}}}},{"exists":{"field":"data.salary"}}]}}
+(9 rows)
+
+SELECT id FROM json_path_expr WHERE description @@@ 'engineer' AND data ? 'salary' ORDER BY id;
+ id 
+----
+  1
+  2
+(2 rows)
+
+EXPLAIN (COSTS OFF) SELECT id FROM json_path_expr WHERE description @@@ 'engineer' AND data->'team' ? 'name' ORDER BY id;
+                                                                                                         QUERY PLAN                                                                                                         
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort
+   Sort Key: id
+   ->  Custom Scan (ParadeDB Base Scan) on json_path_expr
+         Table: json_path_expr
+         Index: idx_json_path_expr
+         Exec Method: ColumnarExecState
+         Columnar: id
+         Scores: false
+         Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"parse_with_field":{"field":"description","query_string":"engineer","lenient":null,"conjunction_mode":null}}}},{"exists":{"field":"data.team.name"}}]}}
+(9 rows)
+
+SELECT id FROM json_path_expr WHERE description @@@ 'engineer' AND data->'team' ? 'name' ORDER BY id;
+ id 
+----
+  1
+(1 row)
+
+DROP TABLE json_path_expr CASCADE;

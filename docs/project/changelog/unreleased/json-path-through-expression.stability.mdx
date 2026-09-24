@@ -1,0 +1,5 @@
+---
+header: stability
+---
+
+A JSON operator whose operand was an expression over a JSON column, such as `(data - 'salary') ? 'salary'`, was pushed down as if it applied to the column itself: the path finder looked through any operator for the column, and took a constant array argument of it for keys of the path. The filter then tested the index's copy of the column rather than the value the expression returns, so a view that removes keys from a column answered a filter on a removed key from the index. Only the JSON path operators (`->`, `->>`, `#>`, `#>>`) and subscripts are now read as a path; any other expression is evaluated by the heap filter.
