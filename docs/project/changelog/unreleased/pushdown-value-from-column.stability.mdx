@@ -1,0 +1,5 @@
+---
+header: stability
+---
+
+A comparison whose value comes from a column of the same row, such as `(data->>'a')::float > (data->>'b')::float`, is no longer pushed down. The value of a pushed-down comparison is solved once, before the scan reads its first row, so a value that a row supplies had no row to come from and the backend terminated with a segmentation fault. Postgres now compares the two values row by row. A comparison with a constant, a parameter or an uncorrelated expression is still pushed down.

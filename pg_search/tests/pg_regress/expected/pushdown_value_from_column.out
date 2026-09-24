@@ -1,0 +1,67 @@
+-- =====================================================================
+-- A pushdown whose value comes from a column is left to Postgres
+-- =====================================================================
+-- The value of a pushed-down comparison is solved once, before the scan
+-- reads its first row. A value that a row supplies has no row to come
+-- from, and solving it read a column of a tuple slot that holds no
+-- tuple, which terminated the backend. A cast of a JSON value takes this
+-- path: the left side resolves to the indexed field `data.a`, and the
+-- right side reads the same column.
+CREATE EXTENSION IF NOT EXISTS pg_search;
+DROP TABLE IF EXISTS pushdown_value_from_column;
+CREATE TABLE pushdown_value_from_column (
+    id SERIAL PRIMARY KEY,
+    description TEXT,
+    data JSONB
+);
+INSERT INTO pushdown_value_from_column (description, data)
+SELECT 'item', jsonb_build_object('a', i, 'b', 5) FROM generate_series(1, 10) i;
+CREATE INDEX idx_pushdown_value_from_column ON pushdown_value_from_column
+USING paradedb (id, description, (data::pdb.literal));
+-- Test 1: a comparison of two JSON values of the same row: 5 rows have a > b
+EXPLAIN (COSTS OFF) SELECT count(*) FROM pushdown_value_from_column
+WHERE description @@@ 'item' AND (data->>'a')::float > (data->>'b')::float;
+                                                                                                                                                                           QUERY PLAN                                                                                                                                                                           
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Custom Scan (ParadeDB Aggregate Scan) on pushdown_value_from_column
+   Index: idx_pushdown_value_from_column
+   Tantivy Query: {"boolean":{"must":[{"heap_filter":{"indexed_query":{"boolean":{"must":[{"with_index":{"query":{"parse_with_field":{"field":"description","query_string":"item","lenient":null,"conjunction_mode":null}}}}]}},"always_filters":[{"heap_filter":"(((data ->> 'a'::text))::double precision > ((data ->> 'b'::text))::double precision)"}]}}]}}
+     Applies to Aggregates: COUNT(*)
+     Aggregate Definition: {"0":{"filter":"*"}}
+(5 rows)
+
+SELECT count(*) FROM pushdown_value_from_column
+WHERE description @@@ 'item' AND (data->>'a')::float > (data->>'b')::float;
+ count 
+-------
+     5
+(1 row)
+
+-- Test 2: the same comparison as an aggregate's FILTER
+SELECT count(*) FILTER (WHERE (data->>'a')::float > (data->>'b')::float)
+FROM pushdown_value_from_column WHERE description @@@ 'item';
+ count 
+-------
+     5
+(1 row)
+
+-- Test 3: a comparison with a constant is still pushed down
+EXPLAIN (COSTS OFF) SELECT count(*) FROM pushdown_value_from_column
+WHERE description @@@ 'item' AND (data->>'a')::float > 5;
+                                                                                                                        QUERY PLAN                                                                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Custom Scan (ParadeDB Aggregate Scan) on pushdown_value_from_column
+   Index: idx_pushdown_value_from_column
+   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"parse_with_field":{"field":"description","query_string":"item","lenient":null,"conjunction_mode":null}}}},{"range":{"field":"data.a","lower_bound":{"excluded":5.0},"upper_bound":null}}]}}
+     Applies to Aggregates: COUNT(*)
+     Aggregate Definition: {"0":{"filter":"*"}}
+(5 rows)
+
+SELECT count(*) FROM pushdown_value_from_column
+WHERE description @@@ 'item' AND (data->>'a')::float > 5;
+ count 
+-------
+     5
+(1 row)
+
+DROP TABLE pushdown_value_from_column;

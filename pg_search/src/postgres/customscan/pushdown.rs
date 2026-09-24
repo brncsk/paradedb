@@ -333,6 +333,12 @@ pub unsafe fn try_build_pushdown_qual(
                 // It's in this RTI, so we can use it directly.
                 if !pushed_down_funcexpr.is_complex() {
                     Some(Qual::PushdownExpr { funcexpr: pushed_down_funcexpr })
+                } else if maybe_value.contains_var() {
+                    // The value is solved once, before the scan reads its first row, so a
+                    // value that a row supplies has no row to come from: solving it read a
+                    // column of a tuple slot that holds no tuple. Decline the pushdown and
+                    // let the comparison run row by row.
+                    None
                 } else {
                     Some(Qual::Expr {
                         node: pushed_down_funcexpr.cast(),
