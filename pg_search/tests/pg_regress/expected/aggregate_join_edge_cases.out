@@ -399,25 +399,31 @@ JOIN ec_reviews r ON p.category = r.category
 WHERE (p.description ||| 'laptop' OR p.description ||| 'shoes' OR p.description ||| 'jacket' OR p.description ||| 'monitor' OR p.description ||| 'racket' OR p.description ||| 'novel')
 GROUP BY 1
 ORDER BY 1;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 QUERY PLAN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Sort
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  QUERY PLAN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Group
    Output: ((p.metadata -> 'brand'::text))
-   Sort Key: ((p.metadata -> 'brand'::text))
-   ->  Custom Scan (ParadeDB Aggregate Scan)
+   Group Key: ((p.metadata -> 'brand'::text))
+   ->  Sort
          Output: ((p.metadata -> 'brand'::text))
-         Backend: DataFusion
-         Indexes: ec_products_idx (p), ec_reviews_idx (r)
-         Group By: metadata.brand
-         DataFusion Physical Plan: 
-           : AggregateExec: mode=Single, gby=[metadata.brand@0 as metadata.brand], aggr=[]
-           :   TantivyDecodeExec: decode=[metadata.brand]
-           :     HashJoinExec: mode=CollectLeft, join_type=LeftSemi, on=[(category@1, category@0)], projection=[metadata.brand@0]
-           :       CooperativeExec
-           :         PgSearchScan: table=p, segments=2, fetch=[metadata.brand], visibility=eager, query={"boolean":{"should":[{"with_index":{"query":{"match":{"field":"description","value":"laptop","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"description","value":"shoes","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"description","value":"jacket","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"description","value":"monitor","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"description","value":"racket","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"description","value":"novel","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}]}}
-           :       CooperativeExec
-           :         PgSearchScan: table=r, segments=1, dynamic_filters=1, visibility=eager, query="all"
-(16 rows)
+         Sort Key: ((p.metadata -> 'brand'::text))
+         ->  Hash Join
+               Output: (p.metadata -> 'brand'::text)
+               Hash Cond: (r.category = p.category)
+               ->  Seq Scan on public.ec_reviews r
+                     Output: r.id, r.category, r.rating, r.reviewer
+               ->  Hash
+                     Output: p.metadata, p.category
+                     ->  Custom Scan (ParadeDB Base Scan) on public.ec_products p
+                           Output: p.metadata, p.category
+                           Table: ec_products
+                           Index: ec_products_idx
+                           Worker Selection: Cost model
+                           Exec Method: NormalScanExecState
+                           Scores: false
+                           Tantivy Query: {"boolean":{"should":[{"with_index":{"query":{"match":{"field":"description","value":"laptop","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"description","value":"shoes","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"description","value":"jacket","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"description","value":"monitor","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"description","value":"racket","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}},{"with_index":{"query":{"match":{"field":"description","value":"novel","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}]}}
+(21 rows)
 
 SELECT p.metadata -> 'brand'
 FROM ec_products p
@@ -425,6 +431,7 @@ JOIN ec_reviews r ON p.category = r.category
 WHERE (p.description ||| 'laptop' OR p.description ||| 'shoes' OR p.description ||| 'jacket' OR p.description ||| 'monitor' OR p.description ||| 'racket' OR p.description ||| 'novel')
 GROUP BY 1
 ORDER BY 1;
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
   ?column?   
 -------------
  "Smash"
@@ -464,21 +471,37 @@ LEFT JOIN ec_suppliers s ON r.category = s.category
 WHERE p.description ||| 'laptop'
 GROUP BY p.metadata->>'brand', p.metadata->'brand'
 ORDER BY brand_text;
-                                                                                                                                      QUERY PLAN                                                                                                                                      
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Sort
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
+                                                                                                            QUERY PLAN                                                                                                            
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Group
    Output: ((p.metadata ->> 'brand'::text)), ((p.metadata -> 'brand'::text))
-   Sort Key: ((p.metadata ->> 'brand'::text))
-   ->  Custom Scan (ParadeDB Aggregate Scan)
+   Group Key: ((p.metadata ->> 'brand'::text)), ((p.metadata -> 'brand'::text))
+   ->  Sort
          Output: ((p.metadata ->> 'brand'::text)), ((p.metadata -> 'brand'::text))
-         Backend: DataFusion
-         Indexes: ec_products_idx (p), ec_reviews_idx (r), ec_suppliers_idx (s)
-         Group By: metadata.brand
-         DataFusion Physical Plan: 
-           : AggregateExec: mode=Single, gby=[metadata.brand@0 as metadata.brand], aggr=[]
-           :   CooperativeExec
-           :     PgSearchScan: table=p, segments=2, eager=[metadata.brand], visibility=eager, query={"with_index":{"query":{"match":{"field":"description","value":"laptop","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
-(12 rows)
+         Sort Key: ((p.metadata ->> 'brand'::text)), ((p.metadata -> 'brand'::text))
+         ->  Nested Loop Left Join
+               Output: (p.metadata ->> 'brand'::text), (p.metadata -> 'brand'::text)
+               Join Filter: (r.category = s.category)
+               ->  Hash Right Join
+                     Output: p.metadata, r.category
+                     Inner Unique: true
+                     Hash Cond: (r.id = p.id)
+                     ->  Seq Scan on public.ec_reviews r
+                           Output: r.id, r.category, r.rating, r.reviewer
+                     ->  Hash
+                           Output: p.metadata, p.id
+                           ->  Custom Scan (ParadeDB Base Scan) on public.ec_products p
+                                 Output: p.metadata, p.id
+                                 Table: ec_products
+                                 Index: ec_products_idx
+                                 Worker Selection: Cost model
+                                 Exec Method: NormalScanExecState
+                                 Scores: false
+                                 Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"laptop","tokenizer":null,"distance":null,"transposition_cost_one":null,"prefix":null,"conjunction_mode":false}}}}
+               ->  Seq Scan on public.ec_suppliers s
+                     Output: s.id, s.category, s.supplier_name
+(27 rows)
 
 SELECT p.metadata->>'brand' AS brand_text, p.metadata->'brand' AS brand_json
 FROM ec_products p
@@ -487,6 +510,7 @@ LEFT JOIN ec_suppliers s ON r.category = s.category
 WHERE p.description ||| 'laptop'
 GROUP BY p.metadata->>'brand', p.metadata->'brand'
 ORDER BY brand_text;
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
  brand_text | brand_json 
 ------------+------------
  TechCorp   | "TechCorp"

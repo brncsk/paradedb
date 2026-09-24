@@ -54,17 +54,22 @@ WHERE id @@@ paradedb.all()
 GROUP BY id, metadata->>'color'
 ORDER BY id, metadata->>'color'
 LIMIT 5;
-                                                                                                                   QUERY PLAN                                                                                                                   
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+WARNING:  Aggregate Scan not used: grouping field metadata.color is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: mock_items)
+                                    QUERY PLAN                                     
+-----------------------------------------------------------------------------------
  Limit
-   ->  Custom Scan (ParadeDB Aggregate Scan) on mock_items
-         Index: mock_items_id_description_rating_category_metadata_idx
-         Tantivy Query: {"with_index":{"query":"all"}}
-           Applies to Aggregates: COUNT(*)
-           Group By: id, metadata.color
-           Limit: 5
-           Aggregate Definition: {"grouped":{"aggs":{"grouped":{"terms":{"field":"metadata.color","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"id","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(8 rows)
+   ->  GroupAggregate
+         Group Key: id, ((metadata ->> 'color'::text))
+         ->  Sort
+               Sort Key: id, ((metadata ->> 'color'::text))
+               ->  Custom Scan (ParadeDB Base Scan) on mock_items
+                     Table: mock_items
+                     Index: mock_items_id_description_rating_category_metadata_idx
+                     Exec Method: NormalScanExecState
+                     Scores: false
+                     Full Index Scan: true
+                     Tantivy Query: {"with_index":{"query":"all"}}
+(12 rows)
 
 SELECT id, metadata->>'color' AS color, COUNT(*)
 FROM mock_items
@@ -72,6 +77,7 @@ WHERE id @@@ paradedb.all()
 GROUP BY id, metadata->>'color'
 ORDER BY id, metadata->>'color'
 LIMIT 5;
+WARNING:  Aggregate Scan not used: grouping field metadata.color is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: mock_items)
  id | color  | count 
 ----+--------+-------
   1 | Silver |     1

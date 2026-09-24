@@ -31,33 +31,34 @@ FROM ju JOIN jp ON ju.id = jp.id
 WHERE ju.name IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
-                                                              QUERY PLAN                                                               
----------------------------------------------------------------------------------------------------------------------------------------
- Sort
-   Output: ((ju.metadata ->> 'brand'::text)), (count(*))
-   Sort Key: ((ju.metadata ->> 'brand'::text))
-   ->  Custom Scan (ParadeDB Aggregate Scan)
-         Output: ((ju.metadata ->> 'brand'::text)), (count(*))
-         Backend: DataFusion
-         Indexes: ju_idx (ju), jp_idx (jp)
-         Group By: metadata.brand
-         Aggregates: COUNT(*)
-         DataFusion Physical Plan: 
-           : AggregateExec: mode=Final, gby=[metadata.brand@0 as metadata.brand], aggr=[count(1) as agg_0]
-           :   TantivyDecodeExec: decode=[metadata.brand]
-           :     AggregateExec: mode=Partial, gby=[metadata.brand@0 as metadata.brand], aggr=[count(1) as agg_0]
-           :       HashJoinExec: mode=CollectLeft, join_type=Inner, on=[(id@1, id@0)], projection=[metadata.brand@0]
-           :         CooperativeExec
-           :           PgSearchScan: table=ju, segments=3, fetch=[metadata.brand], visibility=eager, query={"exists":{"field":"name"}}
-           :         CooperativeExec
-           :           PgSearchScan: table=jp, segments=1, dynamic_filters=1, visibility=eager, query="all"
-(18 rows)
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
+                       QUERY PLAN                        
+---------------------------------------------------------
+ GroupAggregate
+   Output: ((ju.metadata ->> 'brand'::text)), count(*)
+   Group Key: ((ju.metadata ->> 'brand'::text))
+   ->  Sort
+         Output: ((ju.metadata ->> 'brand'::text))
+         Sort Key: ((ju.metadata ->> 'brand'::text))
+         ->  Hash Join
+               Output: (ju.metadata ->> 'brand'::text)
+               Inner Unique: true
+               Hash Cond: (jp.id = ju.id)
+               ->  Seq Scan on public.jp
+                     Output: jp.id, jp.name
+               ->  Hash
+                     Output: ju.metadata, ju.id
+                     ->  Seq Scan on public.ju
+                           Output: ju.metadata, ju.id
+                           Filter: (ju.name IS NOT NULL)
+(17 rows)
 
 SELECT ju.metadata->>'brand', count(*)
 FROM ju JOIN jp ON ju.id = jp.id
 WHERE ju.name IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
  ?column? | count 
 ----------+-------
  apple    |    20
@@ -74,31 +75,34 @@ FROM ju JOIN jp ON ju.id = jp.id
 WHERE ju.name IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
-                                                   QUERY PLAN                                                    
------------------------------------------------------------------------------------------------------------------
- Sort
-   Output: ((ju.metadata ->> 'brand'::text)), (count(*))
-   Sort Key: ((ju.metadata ->> 'brand'::text))
-   ->  Custom Scan (ParadeDB Aggregate Scan)
-         Output: ((ju.metadata ->> 'brand'::text)), (count(*))
-         Backend: DataFusion
-         Indexes: ju_idx (ju), jp_idx (jp)
-         Group By: metadata.brand
-         Aggregates: COUNT(*)
-         DataFusion Physical Plan: 
-           : AggregateExec: mode=Single, gby=[metadata.brand@0 as metadata.brand], aggr=[count(1) as agg_0]
-           :   HashJoinExec: mode=CollectLeft, join_type=Inner, on=[(id@1, id@0)], projection=[metadata.brand@0]
-           :     CooperativeExec
-           :       PgSearchScan: table=ju, segments=3, visibility=eager, query={"exists":{"field":"name"}}
-           :     CooperativeExec
-           :       PgSearchScan: table=jp, segments=1, dynamic_filters=1, visibility=eager, query="all"
-(16 rows)
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
+                       QUERY PLAN                        
+---------------------------------------------------------
+ GroupAggregate
+   Output: ((ju.metadata ->> 'brand'::text)), count(*)
+   Group Key: ((ju.metadata ->> 'brand'::text))
+   ->  Sort
+         Output: ((ju.metadata ->> 'brand'::text))
+         Sort Key: ((ju.metadata ->> 'brand'::text))
+         ->  Hash Join
+               Output: (ju.metadata ->> 'brand'::text)
+               Inner Unique: true
+               Hash Cond: (jp.id = ju.id)
+               ->  Seq Scan on public.jp
+                     Output: jp.id, jp.name
+               ->  Hash
+                     Output: ju.metadata, ju.id
+                     ->  Seq Scan on public.ju
+                           Output: ju.metadata, ju.id
+                           Filter: (ju.name IS NOT NULL)
+(17 rows)
 
 SELECT ju.metadata->>'brand', count(*)
 FROM ju JOIN jp ON ju.id = jp.id
 WHERE ju.name IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
  ?column? | count 
 ----------+-------
  apple    |    20
@@ -115,34 +119,34 @@ FROM ju JOIN jp ON ju.id = jp.id
 WHERE ju.name IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
-                                                      QUERY PLAN                                                       
------------------------------------------------------------------------------------------------------------------------
- Sort
-   Output: ((ju.metadata ->> 'brand'::text)), (count(*))
-   Sort Key: ((ju.metadata ->> 'brand'::text))
-   ->  Custom Scan (ParadeDB Aggregate Scan)
-         Output: ((ju.metadata ->> 'brand'::text)), (count(*))
-         Backend: DataFusion
-         Indexes: ju_idx (ju), jp_idx (jp)
-         Group By: metadata.brand
-         Aggregates: COUNT(*)
-         DataFusion Physical Plan: 
-           : AggregateExec: mode=Final, gby=[metadata.brand@0 as metadata.brand], aggr=[count(1) as agg_0]
-           :   TantivyDecodeExec: decode=[metadata.brand]
-           :     AggregateExec: mode=Partial, gby=[metadata.brand@0 as metadata.brand], aggr=[count(1) as agg_0]
-           :       TantivyFetchExec: fetch=[metadata.brand]
-           :         HashJoinExec: mode=CollectLeft, join_type=Inner, on=[(id@1, id@0)], projection=[metadata.brand@0]
-           :           CooperativeExec
-           :             PgSearchScan: table=ju, segments=3, visibility=eager, query={"exists":{"field":"name"}}
-           :           CooperativeExec
-           :             PgSearchScan: table=jp, segments=1, dynamic_filters=1, visibility=eager, query="all"
-(19 rows)
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
+                       QUERY PLAN                        
+---------------------------------------------------------
+ GroupAggregate
+   Output: ((ju.metadata ->> 'brand'::text)), count(*)
+   Group Key: ((ju.metadata ->> 'brand'::text))
+   ->  Sort
+         Output: ((ju.metadata ->> 'brand'::text))
+         Sort Key: ((ju.metadata ->> 'brand'::text))
+         ->  Hash Join
+               Output: (ju.metadata ->> 'brand'::text)
+               Inner Unique: true
+               Hash Cond: (jp.id = ju.id)
+               ->  Seq Scan on public.jp
+                     Output: jp.id, jp.name
+               ->  Hash
+                     Output: ju.metadata, ju.id
+                     ->  Seq Scan on public.ju
+                           Output: ju.metadata, ju.id
+                           Filter: (ju.name IS NOT NULL)
+(17 rows)
 
 SELECT ju.metadata->>'brand', count(*)
 FROM ju JOIN jp ON ju.id = jp.id
 WHERE ju.name IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
  ?column? | count 
 ----------+-------
  apple    |    20
@@ -157,33 +161,34 @@ FROM ju JOIN jp ON ju.id = jp.id
 WHERE ju.name IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
-                                                              QUERY PLAN                                                               
----------------------------------------------------------------------------------------------------------------------------------------
- Sort
-   Output: ((ju.metadata -> 'brand'::text)), (count(*))
-   Sort Key: ((ju.metadata -> 'brand'::text))
-   ->  Custom Scan (ParadeDB Aggregate Scan)
-         Output: ((ju.metadata -> 'brand'::text)), (count(*))
-         Backend: DataFusion
-         Indexes: ju_idx (ju), jp_idx (jp)
-         Group By: metadata.brand
-         Aggregates: COUNT(*)
-         DataFusion Physical Plan: 
-           : AggregateExec: mode=Final, gby=[metadata.brand@0 as metadata.brand], aggr=[count(1) as agg_0]
-           :   TantivyDecodeExec: decode=[metadata.brand]
-           :     AggregateExec: mode=Partial, gby=[metadata.brand@0 as metadata.brand], aggr=[count(1) as agg_0]
-           :       HashJoinExec: mode=CollectLeft, join_type=Inner, on=[(id@1, id@0)], projection=[metadata.brand@0]
-           :         CooperativeExec
-           :           PgSearchScan: table=ju, segments=3, fetch=[metadata.brand], visibility=eager, query={"exists":{"field":"name"}}
-           :         CooperativeExec
-           :           PgSearchScan: table=jp, segments=1, dynamic_filters=1, visibility=eager, query="all"
-(18 rows)
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
+                       QUERY PLAN                        
+---------------------------------------------------------
+ GroupAggregate
+   Output: ((ju.metadata -> 'brand'::text)), count(*)
+   Group Key: ((ju.metadata -> 'brand'::text))
+   ->  Sort
+         Output: ((ju.metadata -> 'brand'::text))
+         Sort Key: ((ju.metadata -> 'brand'::text))
+         ->  Hash Join
+               Output: (ju.metadata -> 'brand'::text)
+               Inner Unique: true
+               Hash Cond: (jp.id = ju.id)
+               ->  Seq Scan on public.jp
+                     Output: jp.id, jp.name
+               ->  Hash
+                     Output: ju.metadata, ju.id
+                     ->  Seq Scan on public.ju
+                           Output: ju.metadata, ju.id
+                           Filter: (ju.name IS NOT NULL)
+(17 rows)
 
 SELECT ju.metadata->'brand', count(*)
 FROM ju JOIN jp ON ju.id = jp.id
 WHERE ju.name IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
  ?column? | count 
 ----------+-------
  "apple"  |    20
@@ -197,22 +202,31 @@ FROM ju FULL JOIN jp ON ju.id = jp.id
 WHERE (ju.name @@@ 'bob') OR ((ju.name IS NULL) AND (ju.name @@@ 'bob'))
 GROUP BY ju.metadata->'brand'
 ORDER BY 2;
-                                                                 QUERY PLAN                                                                  
----------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.ju
-   Output: pdb.agg_fn('COUNT(*)'::text), (ju.metadata -> 'brand'::text)
-   Index: ju_idx
-   Tantivy Query: {"with_index":{"query":{"parse_with_field":{"field":"name","query_string":"bob","lenient":null,"conjunction_mode":null}}}}
-     Applies to Aggregates: COUNT(*)
-     Group By: metadata.brand
-     Aggregate Definition: {"grouped":{"terms":{"field":"metadata.brand","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field metadata.brand is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: ju)
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: count(*), ((ju.metadata -> 'brand'::text))
+   Group Key: ((ju.metadata -> 'brand'::text))
+   ->  Sort
+         Output: ((ju.metadata -> 'brand'::text))
+         Sort Key: ((ju.metadata -> 'brand'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.ju
+               Output: (ju.metadata -> 'brand'::text)
+               Table: ju
+               Index: ju_idx
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"parse_with_field":{"field":"name","query_string":"bob","lenient":null,"conjunction_mode":null}}}}
+(14 rows)
 
 SELECT count(*), ju.metadata->'brand'
 FROM ju FULL JOIN jp ON ju.id = jp.id
 WHERE (ju.name @@@ 'bob') OR ((ju.name IS NULL) AND (ju.name @@@ 'bob'))
 GROUP BY ju.metadata->'brand'
 ORDER BY 2;
+WARNING:  Aggregate Scan not used: grouping field metadata.brand is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: ju)
  count | ?column? 
 -------+----------
     20 | "apple"
@@ -227,33 +241,34 @@ FROM ju RIGHT JOIN jp ON ju.id = jp.id
 WHERE jp.name IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
-                                                        QUERY PLAN                                                         
----------------------------------------------------------------------------------------------------------------------------
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
+                           QUERY PLAN                            
+-----------------------------------------------------------------
  Sort
    Output: ((ju.metadata ->> 'brand'::text)), (count(jp.id))
    Sort Key: ((ju.metadata ->> 'brand'::text))
-   ->  Custom Scan (ParadeDB Aggregate Scan)
-         Output: ((ju.metadata ->> 'brand'::text)), (count(jp.id))
-         Backend: DataFusion
-         Indexes: jp_idx (jp), ju_idx (ju)
-         Group By: metadata.brand
-         Aggregates: COUNT(id)
-         DataFusion Physical Plan: 
-           : AggregateExec: mode=Final, gby=[metadata.brand@0 as metadata.brand], aggr=[count(jp_0.id) as agg_0]
-           :   TantivyDecodeExec: decode=[metadata.brand]
-           :     AggregateExec: mode=Partial, gby=[metadata.brand@1 as metadata.brand], aggr=[count(jp_0.id) as agg_0]
-           :       HashJoinExec: mode=CollectLeft, join_type=Right, on=[(id@1, id@0)], projection=[id@2, metadata.brand@0]
-           :         CooperativeExec
-           :           PgSearchScan: table=ju, segments=3, fetch=[metadata.brand], visibility=eager, query="all"
-           :         CooperativeExec
-           :           PgSearchScan: table=jp, segments=1, visibility=eager, query={"exists":{"field":"name"}}
-(18 rows)
+   ->  HashAggregate
+         Output: ((ju.metadata ->> 'brand'::text)), count(jp.id)
+         Group Key: (ju.metadata ->> 'brand'::text)
+         ->  Hash Left Join
+               Output: (ju.metadata ->> 'brand'::text), jp.id
+               Inner Unique: true
+               Hash Cond: (jp.id = ju.id)
+               ->  Seq Scan on public.jp
+                     Output: jp.id, jp.name
+                     Filter: (jp.name IS NOT NULL)
+               ->  Hash
+                     Output: ju.metadata, ju.id
+                     ->  Seq Scan on public.ju
+                           Output: ju.metadata, ju.id
+(17 rows)
 
 SELECT ju.metadata->>'brand', count(jp.id)
 FROM ju RIGHT JOIN jp ON ju.id = jp.id
 WHERE jp.name IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.brand is a JSON value, which is grouped by Postgres (table: join)
  ?column? | count 
 ----------+-------
  apple    |    20

@@ -129,19 +129,25 @@ SELECT t_long, COUNT(*) FROM tokenizer_fast WHERE id @@@ pdb.all() GROUP BY t_lo
 -- Aggregate scan pushdown over JSON
 EXPLAIN (FORMAT TEXT, COSTS OFF, TIMING OFF)
 SELECT metadata->>'key', COUNT(*) FROM tokenizer_fast WHERE id @@@ pdb.all() GROUP BY metadata->>'key' ORDER BY metadata->>'key' LIMIT 5;
-                                                               QUERY PLAN                                                                
------------------------------------------------------------------------------------------------------------------------------------------
+WARNING:  Aggregate Scan not used: grouping field metadata.key is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: tokenizer_fast)
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
  Limit
-   ->  Custom Scan (ParadeDB Aggregate Scan) on tokenizer_fast
-         Index: idxtokenizer_fast
-         Tantivy Query: {"with_index":{"query":{"all":{"field":"id"}}}}
-           Applies to Aggregates: COUNT(*)
-           Group By: metadata.key
-           Limit: 5
-           Aggregate Definition: {"grouped":{"terms":{"field":"metadata.key","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(8 rows)
+   ->  GroupAggregate
+         Group Key: ((metadata ->> 'key'::text))
+         ->  Sort
+               Sort Key: ((metadata ->> 'key'::text))
+               ->  Custom Scan (ParadeDB Base Scan) on tokenizer_fast
+                     Table: tokenizer_fast
+                     Index: idxtokenizer_fast
+                     Exec Method: NormalScanExecState
+                     Scores: false
+                     Full Index Scan: true
+                     Tantivy Query: {"with_index":{"query":{"all":{"field":"id"}}}}
+(12 rows)
 
 SELECT metadata->>'key', COUNT(*) FROM tokenizer_fast WHERE id @@@ pdb.all() GROUP BY metadata->>'key' ORDER BY metadata->>'key' LIMIT 5;
+WARNING:  Aggregate Scan not used: grouping field metadata.key is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: tokenizer_fast)
     ?column?     | count 
 -----------------+-------
  Quick brown fox |     1

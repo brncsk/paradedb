@@ -124,6 +124,17 @@ impl CustomScanClause<AggregateScan> for GroupByClause {
 
                 // Check if this field exists in the index schema as a fast field
                 if let Some(search_field) = schema.search_field(&field_name) {
+                    // Reject JSON fields - a JSON value's text form is not what the index
+                    // stores: `->>` renders the number 1.50 as `1.50` and `true` as `true`,
+                    // while the fast field holds the float 1.5 and a boolean, so the groups
+                    // and their keys would differ from what Postgres computes.
+                    if search_field.is_json() {
+                        return Err(format!(
+                            "grouping field {} is a JSON value, which is grouped by Postgres",
+                            field_name
+                        )
+                        .into());
+                    }
                     // Reject NUMERIC fields - GROUP BY pushdown not supported
                     // (NUMERIC values are stored scaled and would need descaling)
                     if search_field.field_type().is_numeric() {

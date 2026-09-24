@@ -38,17 +38,22 @@ FROM json_test
 WHERE id @@@ paradedb.exists('metadata_json.value')
 GROUP BY metadata_json->>'value'
 ORDER BY count DESC, value;
-                                                       QUERY PLAN                                                        
--------------------------------------------------------------------------------------------------------------------------
+WARNING:  Aggregate Scan not used: grouping field metadata_json.value is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test)
+                                               QUERY PLAN                                               
+--------------------------------------------------------------------------------------------------------
  Sort
-   Sort Key: (pdb.agg_fn('COUNT(*)'::text)) DESC, ((metadata_json ->> 'value'::text))
-   ->  Custom Scan (ParadeDB Aggregate Scan) on json_test
-         Index: json_test_idx
-         Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata_json.value"}}}}
-           Applies to Aggregates: COUNT(*)
-           Group By: metadata_json.value
-           Aggregate Definition: {"grouped":{"terms":{"field":"metadata_json.value","segment_size":65000,"size":65000}}}
-(8 rows)
+   Sort Key: (count(*)) DESC, ((metadata_json ->> 'value'::text))
+   ->  GroupAggregate
+         Group Key: ((metadata_json ->> 'value'::text))
+         ->  Sort
+               Sort Key: ((metadata_json ->> 'value'::text))
+               ->  Custom Scan (ParadeDB Base Scan) on json_test
+                     Table: json_test
+                     Index: json_test_idx
+                     Exec Method: NormalScanExecState
+                     Scores: false
+                     Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata_json.value"}}}}
+(12 rows)
 
 -- Verify the results
 SELECT
@@ -58,6 +63,7 @@ FROM json_test
 WHERE id @@@ paradedb.exists('metadata_json.value')
 GROUP BY metadata_json->>'value'
 ORDER BY count DESC, value;
+WARNING:  Aggregate Scan not used: grouping field metadata_json.value is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test)
  value  | count 
 --------+-------
  apple  |     3
@@ -81,17 +87,22 @@ FROM json_test
 WHERE id @@@ paradedb.exists('metadata_json.value')
 GROUP BY metadata_json->'value'
 ORDER BY count DESC;
-                                                                    QUERY PLAN                                                                     
----------------------------------------------------------------------------------------------------------------------------------------------------
+WARNING:  Aggregate Scan not used: grouping field metadata_json.value is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test)
+                                               QUERY PLAN                                               
+--------------------------------------------------------------------------------------------------------
  Sort
-   Sort Key: (pdb.agg_fn('COUNT(*)'::text)) DESC
-   ->  Custom Scan (ParadeDB Aggregate Scan) on json_test
-         Index: json_test_idx
-         Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata_json.value"}}}}
-           Applies to Aggregates: COUNT(*)
-           Group By: metadata_json.value
-           Aggregate Definition: {"grouped":{"terms":{"field":"metadata_json.value","order":{"_count":"desc"},"segment_size":65000,"size":65000}}}
-(8 rows)
+   Sort Key: (count(*)) DESC
+   ->  GroupAggregate
+         Group Key: ((metadata_json -> 'value'::text))
+         ->  Sort
+               Sort Key: ((metadata_json -> 'value'::text))
+               ->  Custom Scan (ParadeDB Base Scan) on json_test
+                     Table: json_test
+                     Index: json_test_idx
+                     Exec Method: NormalScanExecState
+                     Scores: false
+                     Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata_json.value"}}}}
+(12 rows)
 
 SELECT
     metadata_json->'value' AS value,
@@ -100,6 +111,7 @@ FROM json_test
 WHERE id @@@ paradedb.exists('metadata_json.value')
 GROUP BY metadata_json->'value'
 ORDER BY count DESC;
+WARNING:  Aggregate Scan not used: grouping field metadata_json.value is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test)
   value   | count 
 ----------+-------
  "apple"  |     3
@@ -124,6 +136,7 @@ FROM json_test
 WHERE id @@@ paradedb.exists('metadata_json.value')
 GROUP BY metadata_json->>'value'
 ORDER BY value;
+WARNING:  Aggregate Scan not used: grouping field metadata_json.value is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test)
  value  | count | min_count | max_count 
 --------+-------+-----------+-----------
  apple  |     3 |         2 |         5
@@ -163,6 +176,7 @@ SELECT
 FROM json_test
 GROUP BY metadata_json->>'value'
 ORDER BY value;
+WARNING:  Aggregate Scan not used: grouping field metadata_json.value is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test)
  value  | count 
 --------+-------
  apple  |     3

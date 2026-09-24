@@ -1,0 +1,5 @@
+---
+header: stability
+---
+
+Grouping by a JSON value, `GROUP BY data->>'n'` or `data->'n'`, is now left to Postgres, on the Tantivy backend and the DataFusion backend alike. The aggregate scan grouped on the index's fast field, which holds a JSON number as a float and a boolean as a number, so `1.50` came back as `1.5` and `true` as `1`; with an `ORDER BY` on an aggregate and a `LIMIT` the query failed on a numeric value ("is not a Text column"), and `data->'n'` could not be turned into a `jsonb` result at all. Filters on JSON values are still pushed down, and a `pdb.agg()` spec still groups on the index's own values.

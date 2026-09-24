@@ -177,25 +177,34 @@ WHERE id @@@ pdb.all()
 GROUP BY metadata->>'color'
 ORDER BY metadata->>'color'
 LIMIT 5;
-                                                                QUERY PLAN                                                                 
--------------------------------------------------------------------------------------------------------------------------------------------
+WARNING:  Aggregate Scan not used: grouping field metadata.color is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: mock_items)
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
  Limit
-   Output: ((metadata ->> 'color'::text)), (pdb.agg_fn('COUNT(*)'::text))
-   ->  Custom Scan (ParadeDB Aggregate Scan) on public.mock_items
-         Output: (metadata ->> 'color'::text), pdb.agg_fn('COUNT(*)'::text)
-         Index: search_idx
-         Tantivy Query: {"with_index":{"query":{"all":{"field":"id"}}}}
-           Applies to Aggregates: COUNT(*)
-           Group By: metadata.color
-           Limit: 5
-           Aggregate Definition: {"grouped":{"terms":{"field":"metadata.color","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(10 rows)
+   Output: ((metadata ->> 'color'::text)), (count(*))
+   ->  GroupAggregate
+         Output: ((metadata ->> 'color'::text)), count(*)
+         Group Key: ((mock_items.metadata ->> 'color'::text))
+         ->  Sort
+               Output: ((metadata ->> 'color'::text))
+               Sort Key: ((mock_items.metadata ->> 'color'::text))
+               ->  Custom Scan (ParadeDB Base Scan) on public.mock_items
+                     Output: (metadata ->> 'color'::text)
+                     Table: mock_items
+                     Index: search_idx
+                     Worker Selection: Cost model
+                     Exec Method: NormalScanExecState
+                     Scores: false
+                     Full Index Scan: true
+                     Tantivy Query: {"with_index":{"query":{"all":{"field":"id"}}}}
+(17 rows)
 
 SELECT metadata->>'color', COUNT(*) FROM mock_items
 WHERE id @@@ pdb.all()
 GROUP BY metadata->>'color'
 ORDER BY metadata->>'color'
 LIMIT 5;
+WARNING:  Aggregate Scan not used: grouping field metadata.color is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: mock_items)
  ?column? | count 
 ----------+-------
  Black    |     8

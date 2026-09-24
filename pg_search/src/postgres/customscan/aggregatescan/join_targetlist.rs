@@ -728,13 +728,18 @@ pub unsafe fn extract_aggregate_targetlist(
         );
     }
 
+    let pdb_agg_funcoids = crate::api::agg_funcoids();
+    let pdb_agg = aggrefs
+        .iter()
+        .any(|aggref| pdb_agg_funcoids.contains(&(**aggref).aggfnoid.to_u32()));
     let context = RawColumnContext {
         root: args.root,
         sources,
         plan,
         outer_root_id,
         shape,
-        pdb_agg_funcoids: crate::api::agg_funcoids(),
+        pdb_agg_funcoids,
+        pdb_agg,
         combine_agg_funcoid,
     };
     let keys = &group_exprs[..clause_positions.len()];
@@ -874,6 +879,9 @@ struct RawColumnContext<'a> {
     shape: GroupingShape,
     pdb_agg_funcoids: [u32; 3],
     combine_agg_funcoid: pg_sys::Oid,
+    /// A `pdb.agg()` spec asks for the index's own aggregation, so its grouping
+    /// keeps the index's view of a JSON value.
+    pdb_agg: bool,
 }
 
 struct ResolvedVar<'a> {
@@ -1016,6 +1024,22 @@ unsafe fn extract_raw_group_column(
             find_source_by_rti(context.sources, rti, "GROUP BY expression").ok(),
         )
     };
+    // A JSON value's text is not what its fast field holds: `->>` renders the
+    // number 1.50 as `1.50` and `true` as `true`, while the field holds the
+    // float 1.5 and a boolean, so the groups and their keys would differ from
+    // the ones Postgres computes, and a numeric value fails the text decode
+    // outright. Postgres groups a JSON value itself.
+    if !context.pdb_agg
+        && numeric_source
+            .and_then(|source| source.bm25_index.as_ref())
+            .and_then(|index| index.schema().ok())
+            .and_then(|schema| schema.search_field(&field_name))
+            .is_some_and(|search_field| search_field.is_json())
+    {
+        return Err(format!(
+            "{label} {field_name} is a JSON value, which is grouped by Postgres"
+        ));
+    }
     let numeric_info = numeric_source
         .and_then(|source| source.bm25_index.as_ref())
         .and_then(|index| index.schema().ok())

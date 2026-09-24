@@ -248,6 +248,7 @@ FROM nulls_test
 WHERE id @@@ paradedb.all()
 GROUP BY json_col->>'category'
 ORDER BY category ASC;
+WARNING:  Aggregate Scan not used: grouping field json_col.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: nulls_test)
  category | count 
 ----------+-------
  berry    |     1
@@ -264,6 +265,7 @@ FROM nulls_test
 WHERE id @@@ paradedb.all()
 GROUP BY json_col->>'category'
 ORDER BY category ASC NULLS FIRST;
+WARNING:  Aggregate Scan not used: grouping field json_col.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: nulls_test)
  category | count 
 ----------+-------
           |     2
@@ -280,6 +282,7 @@ FROM nulls_test
 WHERE id @@@ paradedb.all()
 GROUP BY json_col->>'category'
 ORDER BY category DESC;
+WARNING:  Aggregate Scan not used: grouping field json_col.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: nulls_test)
  category | count 
 ----------+-------
           |     2
@@ -296,6 +299,7 @@ FROM nulls_test
 WHERE id @@@ paradedb.all()
 GROUP BY json_col->>'category'
 ORDER BY category DESC NULLS LAST;
+WARNING:  Aggregate Scan not used: grouping field json_col.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: nulls_test)
  category | count 
 ----------+-------
  veggie   |     1

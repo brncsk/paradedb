@@ -30,16 +30,24 @@ FROM json_test_single
 WHERE id @@@ paradedb.exists('metadata.category')
 GROUP BY metadata->>'category'
 ORDER BY category;
-                                                               QUERY PLAN                                                               
-----------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_single
-   Output: (metadata ->> 'category'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_single
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.category"}}}}
-     Applies to Aggregates: COUNT(*)
-     Group By: metadata.category
-     Aggregate Definition: {"grouped":{"terms":{"field":"metadata.category","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_single)
+                                           QUERY PLAN                                           
+------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((metadata ->> 'category'::text)), count(*)
+   Group Key: ((json_test_single.metadata ->> 'category'::text))
+   ->  Sort
+         Output: ((metadata ->> 'category'::text))
+         Sort Key: ((json_test_single.metadata ->> 'category'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_single
+               Output: (metadata ->> 'category'::text)
+               Table: json_test_single
+               Index: idx_json_single
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.category"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT metadata->>'category' AS category, COUNT(*) AS count
@@ -47,6 +55,7 @@ FROM json_test_single
 WHERE id @@@ paradedb.exists('metadata.category')
 GROUP BY metadata->>'category'
 ORDER BY category;
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_single)
   category   | count 
 -------------+-------
  clothing    |     3
@@ -81,16 +90,24 @@ WHERE id @@@ paradedb.exists('metadata.category')
   AND id @@@ paradedb.exists('metadata.brand')
 GROUP BY metadata->>'category', metadata->>'brand'
 ORDER BY category, brand;
-                                                                                                                       QUERY PLAN                                                                                                                        
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_multiple
-   Output: (metadata ->> 'category'::text), (metadata ->> 'brand'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_multiple
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"metadata.category"}}}},{"with_index":{"query":{"exists":{"field":"metadata.brand"}}}}]}}
-     Applies to Aggregates: COUNT(*)
-     Group By: metadata.category, metadata.brand
-     Aggregate Definition: {"grouped":{"aggs":{"grouped":{"terms":{"field":"metadata.brand","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"metadata.category","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_multiple)
+                                                                                      QUERY PLAN                                                                                      
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((metadata ->> 'category'::text)), ((metadata ->> 'brand'::text)), count(*)
+   Group Key: ((json_test_multiple.metadata ->> 'category'::text)), ((json_test_multiple.metadata ->> 'brand'::text))
+   ->  Sort
+         Output: ((metadata ->> 'category'::text)), ((metadata ->> 'brand'::text))
+         Sort Key: ((json_test_multiple.metadata ->> 'category'::text)), ((json_test_multiple.metadata ->> 'brand'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_multiple
+               Output: (metadata ->> 'category'::text), (metadata ->> 'brand'::text)
+               Table: json_test_multiple
+               Index: idx_json_multiple
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"metadata.category"}}}},{"with_index":{"query":{"exists":{"field":"metadata.brand"}}}}]}}
+(14 rows)
 
 -- Execute the query
 SELECT metadata->>'category' AS category,
@@ -101,6 +118,7 @@ WHERE id @@@ paradedb.exists('metadata.category')
   AND id @@@ paradedb.exists('metadata.brand')
 GROUP BY metadata->>'category', metadata->>'brand'
 ORDER BY category, brand;
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_multiple)
   category   |  brand  | count 
 -------------+---------+-------
  clothing    | Nike    |     2
@@ -134,16 +152,24 @@ FROM json_test_aggregates
 WHERE id @@@ paradedb.exists('metadata.brand')
 GROUP BY metadata->>'brand'
 ORDER BY brand;
-                                                             QUERY PLAN                                                              
--------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_aggregates
-   Output: (metadata ->> 'brand'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_aggregates
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.brand"}}}}
-     Applies to Aggregates: COUNT(*)
-     Group By: metadata.brand
-     Aggregate Definition: {"grouped":{"terms":{"field":"metadata.brand","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field metadata.brand is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_aggregates)
+                                         QUERY PLAN                                          
+---------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((metadata ->> 'brand'::text)), count(*)
+   Group Key: ((json_test_aggregates.metadata ->> 'brand'::text))
+   ->  Sort
+         Output: ((metadata ->> 'brand'::text))
+         Sort Key: ((json_test_aggregates.metadata ->> 'brand'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_aggregates
+               Output: (metadata ->> 'brand'::text)
+               Table: json_test_aggregates
+               Index: idx_json_aggregates
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.brand"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT metadata->>'brand' AS brand, 
@@ -152,6 +178,7 @@ FROM json_test_aggregates
 WHERE id @@@ paradedb.exists('metadata.brand')
 GROUP BY metadata->>'brand'
 ORDER BY brand;
+WARNING:  Aggregate Scan not used: grouping field metadata.brand is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_aggregates)
   brand  | count 
 ---------+-------
  Apple   |     2
@@ -167,16 +194,24 @@ FROM json_test_aggregates
 WHERE id @@@ paradedb.exists('metadata.price')
 GROUP BY metadata->>'category'
 ORDER BY category;
-                                                                                                          QUERY PLAN                                                                                                           
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_aggregates
-   Output: (metadata ->> 'category'::text), pdb.agg_fn('SUM'::text)
-   Index: idx_json_aggregates
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.price"}}}}
-     Applies to Aggregates: SUM(metadata.price)
-     Group By: metadata.category
-     Aggregate Definition: {"grouped":{"aggs":{"0":{"sum":{"field":"metadata.price","missing":null,"none_if_no_match":true}}},"terms":{"field":"metadata.category","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_aggregates)
+                                         QUERY PLAN                                          
+---------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((metadata ->> 'category'::text)), sum(((metadata ->> 'price'::text))::numeric)
+   Group Key: ((json_test_aggregates.metadata ->> 'category'::text))
+   ->  Sort
+         Output: ((metadata ->> 'category'::text)), metadata
+         Sort Key: ((json_test_aggregates.metadata ->> 'category'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_aggregates
+               Output: (metadata ->> 'category'::text), metadata
+               Table: json_test_aggregates
+               Index: idx_json_aggregates
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.price"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT metadata->>'category' AS category, 
@@ -185,6 +220,7 @@ FROM json_test_aggregates
 WHERE id @@@ paradedb.exists('metadata.price')
 GROUP BY metadata->>'category'
 ORDER BY category;
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_aggregates)
  category | total_price 
 ----------+-------------
           |        3285
@@ -199,16 +235,24 @@ FROM json_test_aggregates
 WHERE id @@@ paradedb.exists('metadata.price')
 GROUP BY metadata->>'brand'
 ORDER BY brand;
-                                                                                             QUERY PLAN                                                                                             
-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_aggregates
-   Output: (metadata ->> 'brand'::text), pdb.agg_fn('AVG'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_aggregates
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.price"}}}}
-     Applies to Aggregates: AVG(metadata.price), COUNT(*)
-     Group By: metadata.brand
-     Aggregate Definition: {"grouped":{"aggs":{"0":{"avg":{"field":"metadata.price","missing":null}}},"terms":{"field":"metadata.brand","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field metadata.brand is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_aggregates)
+                                            QUERY PLAN                                            
+--------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((metadata ->> 'brand'::text)), avg(((metadata ->> 'price'::text))::numeric), count(*)
+   Group Key: ((json_test_aggregates.metadata ->> 'brand'::text))
+   ->  Sort
+         Output: ((metadata ->> 'brand'::text)), metadata
+         Sort Key: ((json_test_aggregates.metadata ->> 'brand'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_aggregates
+               Output: (metadata ->> 'brand'::text), metadata
+               Table: json_test_aggregates
+               Index: idx_json_aggregates
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.price"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT metadata->>'brand' AS brand, 
@@ -218,11 +262,12 @@ FROM json_test_aggregates
 WHERE id @@@ paradedb.exists('metadata.price')
 GROUP BY metadata->>'brand'
 ORDER BY brand;
-  brand  | avg_price | item_count 
----------+-----------+------------
- Apple   |      1149 |          2
- Nike    |        94 |          2
- Samsung |       799 |          1
+WARNING:  Aggregate Scan not used: grouping field metadata.brand is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_aggregates)
+  brand  |       avg_price       | item_count 
+---------+-----------------------+------------
+ Apple   | 1149.0000000000000000 |          2
+ Nike    |   94.0000000000000000 |          2
+ Samsung |  799.0000000000000000 |          1
 (3 rows)
 
 -- Test JSON field GROUP BY with MIN/MAX with EXPLAIN
@@ -235,16 +280,24 @@ FROM json_test_aggregates
 WHERE id @@@ paradedb.exists('metadata.price')
 GROUP BY metadata->>'category'
 ORDER BY category;
-                                                                                                                         QUERY PLAN                                                                                                                          
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_aggregates
-   Output: (metadata ->> 'category'::text), pdb.agg_fn('MIN'::text), pdb.agg_fn('MAX'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_aggregates
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.price"}}}}
-     Applies to Aggregates: MIN(metadata.price), MAX(metadata.price), COUNT(*)
-     Group By: metadata.category
-     Aggregate Definition: {"grouped":{"aggs":{"0":{"min":{"field":"metadata.price","missing":null}},"1":{"max":{"field":"metadata.price","missing":null}}},"terms":{"field":"metadata.category","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_aggregates)
+                                                                    QUERY PLAN                                                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((metadata ->> 'category'::text)), min(((metadata ->> 'price'::text))::numeric), max(((metadata ->> 'price'::text))::numeric), count(*)
+   Group Key: ((json_test_aggregates.metadata ->> 'category'::text))
+   ->  Sort
+         Output: ((metadata ->> 'category'::text)), metadata
+         Sort Key: ((json_test_aggregates.metadata ->> 'category'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_aggregates
+               Output: (metadata ->> 'category'::text), metadata
+               Table: json_test_aggregates
+               Index: idx_json_aggregates
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.price"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT metadata->>'category' AS category, 
@@ -255,6 +308,7 @@ FROM json_test_aggregates
 WHERE id @@@ paradedb.exists('metadata.price')
 GROUP BY metadata->>'category'
 ORDER BY category;
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_aggregates)
  category | min_price | max_price | item_count 
 ----------+-----------+-----------+------------
           |        89 |      1299 |          5
@@ -272,16 +326,24 @@ FROM json_test_aggregates
 WHERE id @@@ paradedb.exists('metadata.price')
 GROUP BY metadata->>'brand'
 ORDER BY brand;
-                                                                                                                                                                                          QUERY PLAN                                                                                                                                                                                          
-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_aggregates
-   Output: (metadata ->> 'brand'::text), pdb.agg_fn('COUNT(*)'::text), pdb.agg_fn('SUM'::text), pdb.agg_fn('AVG'::text), pdb.agg_fn('MIN'::text), pdb.agg_fn('MAX'::text)
-   Index: idx_json_aggregates
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.price"}}}}
-     Applies to Aggregates: COUNT(*), SUM(metadata.price), AVG(metadata.price), MIN(metadata.price), MAX(metadata.price)
-     Group By: metadata.brand
-     Aggregate Definition: {"grouped":{"aggs":{"0":{"sum":{"field":"metadata.price","missing":null,"none_if_no_match":true}},"1":{"avg":{"field":"metadata.price","missing":null}},"2":{"min":{"field":"metadata.price","missing":null}},"3":{"max":{"field":"metadata.price","missing":null}}},"terms":{"field":"metadata.brand","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field metadata.brand is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_aggregates)
+                                                                                                                 QUERY PLAN                                                                                                                 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((metadata ->> 'brand'::text)), count(*), sum(((metadata ->> 'price'::text))::numeric), avg(((metadata ->> 'price'::text))::numeric), min(((metadata ->> 'price'::text))::numeric), max(((metadata ->> 'price'::text))::numeric)
+   Group Key: ((json_test_aggregates.metadata ->> 'brand'::text))
+   ->  Sort
+         Output: ((metadata ->> 'brand'::text)), metadata
+         Sort Key: ((json_test_aggregates.metadata ->> 'brand'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_aggregates
+               Output: (metadata ->> 'brand'::text), metadata
+               Table: json_test_aggregates
+               Index: idx_json_aggregates
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.price"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT metadata->>'brand' AS brand, 
@@ -294,11 +356,12 @@ FROM json_test_aggregates
 WHERE id @@@ paradedb.exists('metadata.price')
 GROUP BY metadata->>'brand'
 ORDER BY brand;
-  brand  | item_count | total_value | avg_price | min_price | max_price 
----------+------------+-------------+-----------+-----------+-----------
- Apple   |          2 |        2298 |      1149 |       999 |      1299
- Nike    |          2 |         188 |        94 |        89 |        99
- Samsung |          1 |         799 |       799 |       799 |       799
+WARNING:  Aggregate Scan not used: grouping field metadata.brand is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_aggregates)
+  brand  | item_count | total_value |       avg_price       | min_price | max_price 
+---------+------------+-------------+-----------------------+-----------+-----------
+ Apple   |          2 |        2298 | 1149.0000000000000000 |       999 |      1299
+ Nike    |          2 |         188 |   94.0000000000000000 |        89 |        99
+ Samsung |          1 |         799 |  799.0000000000000000 |       799 |       799
 (3 rows)
 
 -- =========================================
@@ -325,22 +388,32 @@ FROM json_test_nulls
 WHERE id @@@ paradedb.all()
 GROUP BY metadata->>'category'
 ORDER BY category NULLS FIRST;
-                                                               QUERY PLAN                                                               
-----------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_nulls
-   Output: (metadata ->> 'category'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_nulls
-   Tantivy Query: {"with_index":{"query":"all"}}
-     Applies to Aggregates: COUNT(*)
-     Group By: metadata.category
-     Aggregate Definition: {"grouped":{"terms":{"field":"metadata.category","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_nulls)
+                                   QUERY PLAN                                    
+---------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((metadata ->> 'category'::text)), count(*)
+   Group Key: ((json_test_nulls.metadata ->> 'category'::text))
+   ->  Sort
+         Output: ((metadata ->> 'category'::text))
+         Sort Key: ((json_test_nulls.metadata ->> 'category'::text)) NULLS FIRST
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_nulls
+               Output: (metadata ->> 'category'::text)
+               Table: json_test_nulls
+               Index: idx_json_nulls
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Full Index Scan: true
+               Tantivy Query: {"with_index":{"query":"all"}}
+(15 rows)
 
 SELECT metadata->>'category' AS category, COUNT(*) AS count
 FROM json_test_nulls
 WHERE id @@@ paradedb.all()
 GROUP BY metadata->>'category'
 ORDER BY category NULLS FIRST;
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_nulls)
   category   | count 
 -------------+-------
              |     2
@@ -375,16 +448,24 @@ FROM ledger_transactions
 WHERE id @@@ paradedb.exists('metadata_json.reservation_id')
 GROUP BY metadata_json->>'reservation_id'
 ORDER BY txn_key_value;
-                                                                    QUERY PLAN                                                                     
----------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.ledger_transactions
-   Output: (metadata_json ->> 'reservation_id'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_ledger_json
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata_json.reservation_id"}}}}
-     Applies to Aggregates: COUNT(*)
-     Group By: metadata_json.reservation_id
-     Aggregate Definition: {"grouped":{"terms":{"field":"metadata_json.reservation_id","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field metadata_json.reservation_id is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: ledger_transactions)
+                                                QUERY PLAN                                                 
+-----------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((metadata_json ->> 'reservation_id'::text)), count(*)
+   Group Key: ((ledger_transactions.metadata_json ->> 'reservation_id'::text))
+   ->  Sort
+         Output: ((metadata_json ->> 'reservation_id'::text))
+         Sort Key: ((ledger_transactions.metadata_json ->> 'reservation_id'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.ledger_transactions
+               Output: (metadata_json ->> 'reservation_id'::text)
+               Table: ledger_transactions
+               Index: idx_ledger_json
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata_json.reservation_id"}}}}
+(14 rows)
 
 -- Execute the original example query
 SELECT metadata_json->>'reservation_id' AS txn_key_value,
@@ -393,6 +474,7 @@ FROM ledger_transactions
 WHERE id @@@ paradedb.exists('metadata_json.reservation_id')
 GROUP BY metadata_json->>'reservation_id'
 ORDER BY txn_key_value;
+WARNING:  Aggregate Scan not used: grouping field metadata_json.reservation_id is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: ledger_transactions)
  txn_key_value | count 
 ---------------+-------
  res_001       |     2
@@ -429,16 +511,24 @@ WHERE id @@@ paradedb.exists('config.user.profile.settings.theme')
 GROUP BY config->'user'->'profile'->'settings'->>'theme',
          config->'user'->'profile'->'settings'->>'region'
 ORDER BY theme, region;
-                                                                                                                                          QUERY PLAN                                                                                                                                           
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_deep
-   Output: ((((config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'theme'::text), ((((config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'region'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_deep
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"config.user.profile.settings.theme"}}}},{"with_index":{"query":{"exists":{"field":"config.user.profile.settings.region"}}}}]}}
-     Applies to Aggregates: COUNT(*)
-     Group By: config.user.profile.settings.theme, config.user.profile.settings.region
-     Aggregate Definition: {"grouped":{"aggs":{"grouped":{"terms":{"field":"config.user.profile.settings.region","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"config.user.profile.settings.theme","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field config.user.profile.settings.theme is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_deep)
+                                                                                                              QUERY PLAN                                                                                                               
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: (((((config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'theme'::text)), (((((config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'region'::text)), count(*)
+   Group Key: (((((json_test_deep.config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'theme'::text)), (((((json_test_deep.config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'region'::text))
+   ->  Sort
+         Output: (((((config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'theme'::text)), (((((config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'region'::text))
+         Sort Key: (((((json_test_deep.config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'theme'::text)), (((((json_test_deep.config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'region'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_deep
+               Output: ((((config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'theme'::text), ((((config -> 'user'::text) -> 'profile'::text) -> 'settings'::text) ->> 'region'::text)
+               Table: json_test_deep
+               Index: idx_json_deep
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"config.user.profile.settings.theme"}}}},{"with_index":{"query":{"exists":{"field":"config.user.profile.settings.region"}}}}]}}
+(14 rows)
 
 -- Execute the query
 SELECT config->'user'->'profile'->'settings'->>'theme' AS theme,
@@ -450,6 +540,7 @@ WHERE id @@@ paradedb.exists('config.user.profile.settings.theme')
 GROUP BY config->'user'->'profile'->'settings'->>'theme',
          config->'user'->'profile'->'settings'->>'region'
 ORDER BY theme, region;
+WARNING:  Aggregate Scan not used: grouping field config.user.profile.settings.theme is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_deep)
  theme |   region   | count 
 -------+------------+-------
  auto  | us-east    |     1
@@ -493,16 +584,24 @@ FROM json_test_mixed
 WHERE id @@@ paradedb.exists('data.type')
 GROUP BY data->>'type'
 ORDER BY object_type;
-                                                           QUERY PLAN                                                           
---------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_mixed
-   Output: (data ->> 'type'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_mixed
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"data.type"}}}}
-     Applies to Aggregates: COUNT(*)
-     Group By: data.type
-     Aggregate Definition: {"grouped":{"terms":{"field":"data.type","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field data.type is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_mixed)
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((data ->> 'type'::text)), count(*)
+   Group Key: ((json_test_mixed.data ->> 'type'::text))
+   ->  Sort
+         Output: ((data ->> 'type'::text))
+         Sort Key: ((json_test_mixed.data ->> 'type'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_mixed
+               Output: (data ->> 'type'::text)
+               Table: json_test_mixed
+               Index: idx_json_mixed
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"data.type"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT data->>'type' AS object_type, COUNT(*) AS count
@@ -510,6 +609,7 @@ FROM json_test_mixed
 WHERE id @@@ paradedb.exists('data.type')
 GROUP BY data->>'type'
 ORDER BY object_type;
+WARNING:  Aggregate Scan not used: grouping field data.type is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_mixed)
  object_type | count 
 -------------+-------
  event       |     3
@@ -526,16 +626,24 @@ WHERE id @@@ paradedb.term('data.type', 'product')
   AND id @@@ paradedb.exists('data.brand')
 GROUP BY data->>'category', data->>'brand'
 ORDER BY category, brand;
-                                                                                                                   QUERY PLAN                                                                                                                    
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_mixed
-   Output: (data ->> 'category'::text), (data ->> 'brand'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_mixed
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"term":{"field":"data.type","value":"product"}}}},{"with_index":{"query":{"exists":{"field":"data.category"}}}},{"with_index":{"query":{"exists":{"field":"data.brand"}}}}]}}
-     Applies to Aggregates: COUNT(*)
-     Group By: data.category, data.brand
-     Aggregate Definition: {"grouped":{"aggs":{"grouped":{"terms":{"field":"data.brand","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"data.category","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field data.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_mixed)
+                                                                                                                       QUERY PLAN                                                                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((data ->> 'category'::text)), ((data ->> 'brand'::text)), count(*)
+   Group Key: ((json_test_mixed.data ->> 'category'::text)), ((json_test_mixed.data ->> 'brand'::text))
+   ->  Sort
+         Output: ((data ->> 'category'::text)), ((data ->> 'brand'::text))
+         Sort Key: ((json_test_mixed.data ->> 'category'::text)), ((json_test_mixed.data ->> 'brand'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_mixed
+               Output: (data ->> 'category'::text), (data ->> 'brand'::text)
+               Table: json_test_mixed
+               Index: idx_json_mixed
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"term":{"field":"data.type","value":"product"}}}},{"with_index":{"query":{"exists":{"field":"data.category"}}}},{"with_index":{"query":{"exists":{"field":"data.brand"}}}}]}}
+(14 rows)
 
 -- Execute the query
 SELECT data->>'category' AS category, data->>'brand' AS brand, COUNT(*) AS count
@@ -545,6 +653,7 @@ WHERE id @@@ paradedb.term('data.type', 'product')
   AND id @@@ paradedb.exists('data.brand')
 GROUP BY data->>'category', data->>'brand'
 ORDER BY category, brand;
+WARNING:  Aggregate Scan not used: grouping field data.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_mixed)
   category   |  brand  | count 
 -------------+---------+-------
  clothing    | Nike    |     1
@@ -561,16 +670,24 @@ WHERE id @@@ paradedb.term('data.type', 'user')
   AND id @@@ paradedb.exists('data.profile.location.country')
 GROUP BY data->'profile'->'location'->>'country'
 ORDER BY country;
-                                                                                          QUERY PLAN                                                                                          
-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_mixed
-   Output: (((data -> 'profile'::text) -> 'location'::text) ->> 'country'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_mixed
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"term":{"field":"data.type","value":"user"}}}},{"with_index":{"query":{"exists":{"field":"data.profile.location.country"}}}}]}}
-     Applies to Aggregates: COUNT(*)
-     Group By: data.profile.location.country
-     Aggregate Definition: {"grouped":{"terms":{"field":"data.profile.location.country","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field data.profile.location.country is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_mixed)
+                                                                                                QUERY PLAN                                                                                                
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((((data -> 'profile'::text) -> 'location'::text) ->> 'country'::text)), count(*)
+   Group Key: ((((json_test_mixed.data -> 'profile'::text) -> 'location'::text) ->> 'country'::text))
+   ->  Sort
+         Output: ((((data -> 'profile'::text) -> 'location'::text) ->> 'country'::text))
+         Sort Key: ((((json_test_mixed.data -> 'profile'::text) -> 'location'::text) ->> 'country'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_mixed
+               Output: (((data -> 'profile'::text) -> 'location'::text) ->> 'country'::text)
+               Table: json_test_mixed
+               Index: idx_json_mixed
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"term":{"field":"data.type","value":"user"}}}},{"with_index":{"query":{"exists":{"field":"data.profile.location.country"}}}}]}}
+(14 rows)
 
 -- Execute the query
 SELECT data->'profile'->'location'->>'country' AS country, 
@@ -580,6 +697,7 @@ WHERE id @@@ paradedb.term('data.type', 'user')
   AND id @@@ paradedb.exists('data.profile.location.country')
 GROUP BY data->'profile'->'location'->>'country'
 ORDER BY country;
+WARNING:  Aggregate Scan not used: grouping field data.profile.location.country is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_mixed)
  country | user_count 
 ---------+------------
  Canada  |          1
@@ -612,16 +730,24 @@ FROM json_test_operators
 WHERE id @@@ paradedb.exists('payload.metadata.priority')
 GROUP BY payload->'metadata'->>'priority'
 ORDER BY priority_text;
-                                                                   QUERY PLAN                                                                   
-------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_operators
-   Output: ((payload -> 'metadata'::text) ->> 'priority'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_operators
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"payload.metadata.priority"}}}}
-     Applies to Aggregates: COUNT(*)
-     Group By: payload.metadata.priority
-     Aggregate Definition: {"grouped":{"terms":{"field":"payload.metadata.priority","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field payload.metadata.priority is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_operators)
+                                               QUERY PLAN                                               
+--------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: (((payload -> 'metadata'::text) ->> 'priority'::text)), count(*)
+   Group Key: (((json_test_operators.payload -> 'metadata'::text) ->> 'priority'::text))
+   ->  Sort
+         Output: (((payload -> 'metadata'::text) ->> 'priority'::text))
+         Sort Key: (((json_test_operators.payload -> 'metadata'::text) ->> 'priority'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_operators
+               Output: ((payload -> 'metadata'::text) ->> 'priority'::text)
+               Table: json_test_operators
+               Index: idx_json_operators
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"payload.metadata.priority"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT payload->'metadata'->>'priority' AS priority_text,
@@ -630,6 +756,7 @@ FROM json_test_operators
 WHERE id @@@ paradedb.exists('payload.metadata.priority')
 GROUP BY payload->'metadata'->>'priority'
 ORDER BY priority_text;
+WARNING:  Aggregate Scan not used: grouping field payload.metadata.priority is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_operators)
  priority_text | count 
 ---------------+-------
  high          |     2
@@ -645,16 +772,24 @@ FROM json_test_operators
 WHERE id @@@ paradedb.exists('payload.team')
 GROUP BY payload->>'team'
 ORDER BY team;
-                                                            QUERY PLAN                                                             
------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_operators
-   Output: (payload ->> 'team'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_operators
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"payload.team"}}}}
-     Applies to Aggregates: COUNT(*)
-     Group By: payload.team
-     Aggregate Definition: {"grouped":{"terms":{"field":"payload.team","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field payload.team is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_operators)
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((payload ->> 'team'::text)), count(*)
+   Group Key: ((json_test_operators.payload ->> 'team'::text))
+   ->  Sort
+         Output: ((payload ->> 'team'::text))
+         Sort Key: ((json_test_operators.payload ->> 'team'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_operators
+               Output: (payload ->> 'team'::text)
+               Table: json_test_operators
+               Index: idx_json_operators
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"payload.team"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT payload->>'team' AS team,
@@ -663,6 +798,7 @@ FROM json_test_operators
 WHERE id @@@ paradedb.exists('payload.team')
 GROUP BY payload->>'team'
 ORDER BY team;
+WARNING:  Aggregate Scan not used: grouping field payload.team is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_operators)
     team     | count 
 -------------+-------
  engineering |     3
@@ -678,16 +814,24 @@ WHERE id @@@ paradedb.exists('payload.metadata.priority')
   AND id @@@ paradedb.exists('payload.metadata.assignee.team')
 GROUP BY payload->'metadata'->>'priority', payload->'metadata'->'assignee'->>'team'
 ORDER BY priority_text, team;
-                                                                                                                                   QUERY PLAN                                                                                                                                    
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_operators
-   Output: ((payload -> 'metadata'::text) ->> 'priority'::text), (((payload -> 'metadata'::text) -> 'assignee'::text) ->> 'team'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_operators
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"payload.metadata.priority"}}}},{"with_index":{"query":{"exists":{"field":"payload.metadata.assignee.team"}}}}]}}
-     Applies to Aggregates: COUNT(*)
-     Group By: payload.metadata.priority, payload.metadata.assignee.team
-     Aggregate Definition: {"grouped":{"aggs":{"grouped":{"terms":{"field":"payload.metadata.assignee.team","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"payload.metadata.priority","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field payload.metadata.priority is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_operators)
+                                                                                                  QUERY PLAN                                                                                                  
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: (((payload -> 'metadata'::text) ->> 'priority'::text)), ((((payload -> 'metadata'::text) -> 'assignee'::text) ->> 'team'::text)), count(*)
+   Group Key: (((json_test_operators.payload -> 'metadata'::text) ->> 'priority'::text)), ((((json_test_operators.payload -> 'metadata'::text) -> 'assignee'::text) ->> 'team'::text))
+   ->  Sort
+         Output: (((payload -> 'metadata'::text) ->> 'priority'::text)), ((((payload -> 'metadata'::text) -> 'assignee'::text) ->> 'team'::text))
+         Sort Key: (((json_test_operators.payload -> 'metadata'::text) ->> 'priority'::text)), ((((json_test_operators.payload -> 'metadata'::text) -> 'assignee'::text) ->> 'team'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_operators
+               Output: ((payload -> 'metadata'::text) ->> 'priority'::text), (((payload -> 'metadata'::text) -> 'assignee'::text) ->> 'team'::text)
+               Table: json_test_operators
+               Index: idx_json_operators
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"payload.metadata.priority"}}}},{"with_index":{"query":{"exists":{"field":"payload.metadata.assignee.team"}}}}]}}
+(14 rows)
 
 -- Execute the query
 SELECT payload->'metadata'->>'priority' AS priority_text,
@@ -698,6 +842,7 @@ WHERE id @@@ paradedb.exists('payload.metadata.priority')
   AND id @@@ paradedb.exists('payload.metadata.assignee.team')
 GROUP BY payload->'metadata'->>'priority', payload->'metadata'->'assignee'->>'team'
 ORDER BY priority_text, team;
+WARNING:  Aggregate Scan not used: grouping field payload.metadata.priority is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_operators)
  priority_text |    team     | count 
 ---------------+-------------+-------
  high          | engineering |     1
@@ -735,16 +880,24 @@ WHERE id @@@ paradedb.exists('document.source.system')
   AND id @@@ paradedb.exists('document.metrics.category')
 GROUP BY document->'source'->>'system', document->'metrics'->>'category'
 ORDER BY source_system, metric_category;
-                                                                                                                                                                   QUERY PLAN                                                                                                                                                                   
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_complex
-   Output: ((document -> 'source'::text) ->> 'system'::text), ((document -> 'metrics'::text) ->> 'category'::text), pdb.agg_fn('COUNT(*)'::text), pdb.agg_fn('AVG'::text)
-   Index: idx_json_complex
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"document.source.system"}}}},{"with_index":{"query":{"exists":{"field":"document.metrics.category"}}}}]}}
-     Applies to Aggregates: COUNT(*), AVG(document.metrics.score)
-     Group By: document.source.system, document.metrics.category
-     Aggregate Definition: {"grouped":{"aggs":{"grouped":{"aggs":{"0":{"avg":{"field":"document.metrics.score","missing":null}}},"terms":{"field":"document.metrics.category","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"document.source.system","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field document.source.system is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_complex)
+                                                                                              QUERY PLAN                                                                                              
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: (((document -> 'source'::text) ->> 'system'::text)), (((document -> 'metrics'::text) ->> 'category'::text)), count(*), avg((((document -> 'metrics'::text) ->> 'score'::text))::numeric)
+   Group Key: (((json_test_complex.document -> 'source'::text) ->> 'system'::text)), (((json_test_complex.document -> 'metrics'::text) ->> 'category'::text))
+   ->  Sort
+         Output: (((document -> 'source'::text) ->> 'system'::text)), (((document -> 'metrics'::text) ->> 'category'::text)), document
+         Sort Key: (((json_test_complex.document -> 'source'::text) ->> 'system'::text)), (((json_test_complex.document -> 'metrics'::text) ->> 'category'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_complex
+               Output: ((document -> 'source'::text) ->> 'system'::text), ((document -> 'metrics'::text) ->> 'category'::text), document
+               Table: json_test_complex
+               Index: idx_json_complex
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"document.source.system"}}}},{"with_index":{"query":{"exists":{"field":"document.metrics.category"}}}}]}}
+(14 rows)
 
 -- Execute the query
 SELECT document->'source'->>'system' AS source_system,
@@ -756,12 +909,13 @@ WHERE id @@@ paradedb.exists('document.source.system')
   AND id @@@ paradedb.exists('document.metrics.category')
 GROUP BY document->'source'->>'system', document->'metrics'->>'category'
 ORDER BY source_system, metric_category;
- source_system | metric_category | count | avg_score 
----------------+-----------------+-------+-----------
- billing       | A               |     1 |        95
- crm           | A               |     1 |        85
- crm           | B               |     2 |        75
- support       | C               |     1 |        60
+WARNING:  Aggregate Scan not used: grouping field document.source.system is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_complex)
+ source_system | metric_category | count |      avg_score      
+---------------+-----------------+-------+---------------------
+ billing       | A               |     1 | 95.0000000000000000
+ crm           | A               |     1 | 85.0000000000000000
+ crm           | B               |     2 | 75.0000000000000000
+ support       | C               |     1 | 60.0000000000000000
 (4 rows)
 
 -- Test GROUP BY with comprehensive aggregates on scores
@@ -776,16 +930,24 @@ FROM json_test_complex
 WHERE id @@@ paradedb.exists('document.metrics.score')
 GROUP BY document->'metrics'->>'category'
 ORDER BY metric_category;
-                                                                                                                                                                                                               QUERY PLAN                                                                                                                                                                                                                
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_complex
-   Output: ((document -> 'metrics'::text) ->> 'category'::text), pdb.agg_fn('COUNT(*)'::text), pdb.agg_fn('SUM'::text), pdb.agg_fn('AVG'::text), pdb.agg_fn('MIN'::text), pdb.agg_fn('MAX'::text)
-   Index: idx_json_complex
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"document.metrics.score"}}}}
-     Applies to Aggregates: COUNT(*), SUM(document.metrics.score), AVG(document.metrics.score), MIN(document.metrics.score), MAX(document.metrics.score)
-     Group By: document.metrics.category
-     Aggregate Definition: {"grouped":{"aggs":{"0":{"sum":{"field":"document.metrics.score","missing":null,"none_if_no_match":true}},"1":{"avg":{"field":"document.metrics.score","missing":null}},"2":{"min":{"field":"document.metrics.score","missing":null}},"3":{"max":{"field":"document.metrics.score","missing":null}}},"terms":{"field":"document.metrics.category","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field document.metrics.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_complex)
+                                                                                                                                                                       QUERY PLAN                                                                                                                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: (((document -> 'metrics'::text) ->> 'category'::text)), count(*), sum((((document -> 'metrics'::text) ->> 'score'::text))::numeric), avg((((document -> 'metrics'::text) ->> 'score'::text))::numeric), min((((document -> 'metrics'::text) ->> 'score'::text))::numeric), max((((document -> 'metrics'::text) ->> 'score'::text))::numeric)
+   Group Key: (((json_test_complex.document -> 'metrics'::text) ->> 'category'::text))
+   ->  Sort
+         Output: (((document -> 'metrics'::text) ->> 'category'::text)), document
+         Sort Key: (((json_test_complex.document -> 'metrics'::text) ->> 'category'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_complex
+               Output: ((document -> 'metrics'::text) ->> 'category'::text), document
+               Table: json_test_complex
+               Index: idx_json_complex
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"document.metrics.score"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT document->'metrics'->>'category' AS metric_category,
@@ -798,11 +960,12 @@ FROM json_test_complex
 WHERE id @@@ paradedb.exists('document.metrics.score')
 GROUP BY document->'metrics'->>'category'
 ORDER BY metric_category;
- metric_category | total_records | total_score | avg_score | min_score | max_score 
------------------+---------------+-------------+-----------+-----------+-----------
- A               |             2 |         180 |        90 |        85 |        95
- B               |             2 |         150 |        75 |        70 |        80
- C               |             1 |          60 |        60 |        60 |        60
+WARNING:  Aggregate Scan not used: grouping field document.metrics.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_complex)
+ metric_category | total_records | total_score |      avg_score      | min_score | max_score 
+-----------------+---------------+-------------+---------------------+-----------+-----------
+ A               |             2 |         180 | 90.0000000000000000 |        85 |        95
+ B               |             2 |         150 | 75.0000000000000000 |        70 |        80
+ C               |             1 |          60 | 60.0000000000000000 |        60 |        60
 (3 rows)
 
 -- =========================================
@@ -832,16 +995,24 @@ FROM json_test_reconstruction
 WHERE id @@@ paradedb.exists('config.api.version')
 GROUP BY config->'api'->>'version'  -- Group by version string
 ORDER BY api_version;
-                                                               QUERY PLAN                                                                
------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_reconstruction
-   Output: ((config -> 'api'::text) ->> 'version'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_reconstruction
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"config.api.version"}}}}
-     Applies to Aggregates: COUNT(*)
-     Group By: config.api.version
-     Aggregate Definition: {"grouped":{"terms":{"field":"config.api.version","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field config.api.version is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_reconstruction)
+                                           QUERY PLAN                                            
+-------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: (((config -> 'api'::text) ->> 'version'::text)), count(*)
+   Group Key: (((json_test_reconstruction.config -> 'api'::text) ->> 'version'::text))
+   ->  Sort
+         Output: (((config -> 'api'::text) ->> 'version'::text))
+         Sort Key: (((json_test_reconstruction.config -> 'api'::text) ->> 'version'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_reconstruction
+               Output: ((config -> 'api'::text) ->> 'version'::text)
+               Table: json_test_reconstruction
+               Index: idx_json_reconstruction
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"config.api.version"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT 
@@ -851,6 +1022,7 @@ FROM json_test_reconstruction
 WHERE id @@@ paradedb.exists('config.api.version')
 GROUP BY config->'api'->>'version'
 ORDER BY api_version;
+WARNING:  Aggregate Scan not used: grouping field config.api.version is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_reconstruction)
  api_version | count 
 -------------+-------
  v1          |     3
@@ -868,16 +1040,24 @@ WHERE id @@@ paradedb.exists('config.database.host')
   AND id @@@ paradedb.exists('config.api.version')
 GROUP BY config->'database'->>'host', config->'api'->>'version'
 ORDER BY db_host, api_version;
-                                                                                                                           QUERY PLAN                                                                                                                           
-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_reconstruction
-   Output: ((config -> 'database'::text) ->> 'host'::text), ((config -> 'api'::text) ->> 'version'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_reconstruction
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"config.database.host"}}}},{"with_index":{"query":{"exists":{"field":"config.api.version"}}}}]}}
-     Applies to Aggregates: COUNT(*)
-     Group By: config.database.host, config.api.version
-     Aggregate Definition: {"grouped":{"aggs":{"grouped":{"terms":{"field":"config.api.version","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"config.database.host","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field config.database.host is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_reconstruction)
+                                                                                         QUERY PLAN                                                                                          
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: (((config -> 'database'::text) ->> 'host'::text)), (((config -> 'api'::text) ->> 'version'::text)), count(*)
+   Group Key: (((json_test_reconstruction.config -> 'database'::text) ->> 'host'::text)), (((json_test_reconstruction.config -> 'api'::text) ->> 'version'::text))
+   ->  Sort
+         Output: (((config -> 'database'::text) ->> 'host'::text)), (((config -> 'api'::text) ->> 'version'::text))
+         Sort Key: (((json_test_reconstruction.config -> 'database'::text) ->> 'host'::text)), (((json_test_reconstruction.config -> 'api'::text) ->> 'version'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_reconstruction
+               Output: ((config -> 'database'::text) ->> 'host'::text), ((config -> 'api'::text) ->> 'version'::text)
+               Table: json_test_reconstruction
+               Index: idx_json_reconstruction
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"config.database.host"}}}},{"with_index":{"query":{"exists":{"field":"config.api.version"}}}}]}}
+(14 rows)
 
 -- Execute the query
 SELECT 
@@ -889,6 +1069,7 @@ WHERE id @@@ paradedb.exists('config.database.host')
   AND id @@@ paradedb.exists('config.api.version')
 GROUP BY config->'database'->>'host', config->'api'->>'version'
 ORDER BY db_host, api_version;
+WARNING:  Aggregate Scan not used: grouping field config.database.host is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_reconstruction)
  db_host | api_version | count 
 ---------+-------------+-------
  db1     | v1          |     3
@@ -907,16 +1088,24 @@ WHERE id @@@ paradedb.exists('config.api.endpoints.users')
   AND id @@@ paradedb.exists('config.database.port')
 GROUP BY config->'api'->'endpoints'->>'users', config->'database'->>'port'
 ORDER BY users_endpoint, db_port;
-                                                                                                                               QUERY PLAN                                                                                                                               
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_reconstruction
-   Output: (((config -> 'api'::text) -> 'endpoints'::text) ->> 'users'::text), ((config -> 'database'::text) ->> 'port'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_reconstruction
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"config.api.endpoints.users"}}}},{"with_index":{"query":{"exists":{"field":"config.database.port"}}}}]}}
-     Applies to Aggregates: COUNT(*)
-     Group By: config.api.endpoints.users, config.database.port
-     Aggregate Definition: {"grouped":{"aggs":{"grouped":{"terms":{"field":"config.database.port","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"config.api.endpoints.users","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field config.api.endpoints.users is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_reconstruction)
+                                                                                             QUERY PLAN                                                                                              
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((((config -> 'api'::text) -> 'endpoints'::text) ->> 'users'::text)), (((config -> 'database'::text) ->> 'port'::text)), count(*)
+   Group Key: ((((json_test_reconstruction.config -> 'api'::text) -> 'endpoints'::text) ->> 'users'::text)), (((json_test_reconstruction.config -> 'database'::text) ->> 'port'::text))
+   ->  Sort
+         Output: ((((config -> 'api'::text) -> 'endpoints'::text) ->> 'users'::text)), (((config -> 'database'::text) ->> 'port'::text))
+         Sort Key: ((((json_test_reconstruction.config -> 'api'::text) -> 'endpoints'::text) ->> 'users'::text)), (((json_test_reconstruction.config -> 'database'::text) ->> 'port'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_reconstruction
+               Output: (((config -> 'api'::text) -> 'endpoints'::text) ->> 'users'::text), ((config -> 'database'::text) ->> 'port'::text)
+               Table: json_test_reconstruction
+               Index: idx_json_reconstruction
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"config.api.endpoints.users"}}}},{"with_index":{"query":{"exists":{"field":"config.database.port"}}}}]}}
+(14 rows)
 
 -- Execute the query  
 SELECT 
@@ -928,6 +1117,7 @@ WHERE id @@@ paradedb.exists('config.api.endpoints.users')
   AND id @@@ paradedb.exists('config.database.port')
 GROUP BY config->'api'->'endpoints'->>'users', config->'database'->>'port'
 ORDER BY users_endpoint, db_port;
+WARNING:  Aggregate Scan not used: grouping field config.api.endpoints.users is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_reconstruction)
  users_endpoint | db_port | count 
 ----------------+---------+-------
  /api/v1/users  | 3306    |     1
@@ -968,16 +1158,24 @@ WHERE id @@@ paradedb.exists('user_profile.department')
   AND id @@@ paradedb.exists('user_profile.role')
 GROUP BY user_profile->>'department', user_profile->>'role'
 ORDER BY department, role;
-                                                                                                                            QUERY PLAN                                                                                                                            
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_multi_subfields
-   Output: (user_profile ->> 'department'::text), (user_profile ->> 'role'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_multi_subfields
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"user_profile.department"}}}},{"with_index":{"query":{"exists":{"field":"user_profile.role"}}}}]}}
-     Applies to Aggregates: COUNT(*)
-     Group By: user_profile.department, user_profile.role
-     Aggregate Definition: {"grouped":{"aggs":{"grouped":{"terms":{"field":"user_profile.role","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"user_profile.department","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field user_profile.department is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_multi_subfields)
+                                                                                          QUERY PLAN                                                                                           
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((user_profile ->> 'department'::text)), ((user_profile ->> 'role'::text)), count(*)
+   Group Key: ((json_test_multi_subfields.user_profile ->> 'department'::text)), ((json_test_multi_subfields.user_profile ->> 'role'::text))
+   ->  Sort
+         Output: ((user_profile ->> 'department'::text)), ((user_profile ->> 'role'::text))
+         Sort Key: ((json_test_multi_subfields.user_profile ->> 'department'::text)), ((json_test_multi_subfields.user_profile ->> 'role'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_multi_subfields
+               Output: (user_profile ->> 'department'::text), (user_profile ->> 'role'::text)
+               Table: json_test_multi_subfields
+               Index: idx_json_multi_subfields
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"user_profile.department"}}}},{"with_index":{"query":{"exists":{"field":"user_profile.role"}}}}]}}
+(14 rows)
 
 -- Execute the query
 SELECT 
@@ -989,6 +1187,7 @@ WHERE id @@@ paradedb.exists('user_profile.department')
   AND id @@@ paradedb.exists('user_profile.role')
 GROUP BY user_profile->>'department', user_profile->>'role'
 ORDER BY department, role;
+WARNING:  Aggregate Scan not used: grouping field user_profile.department is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_multi_subfields)
  department  |  role   | employee_count 
 -------------+---------+----------------
  Engineering | Junior  |              1
@@ -1012,16 +1211,24 @@ WHERE id @@@ paradedb.exists('user_profile.department')
   AND id @@@ paradedb.exists('user_profile.location')
 GROUP BY user_profile->>'department', user_profile->>'role', user_profile->>'location'
 ORDER BY department, role, location;
-                                                                                                                                                                                        QUERY PLAN                                                                                                                                                                                        
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_multi_subfields
-   Output: (user_profile ->> 'department'::text), (user_profile ->> 'role'::text), (user_profile ->> 'location'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_multi_subfields
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"user_profile.department"}}}},{"with_index":{"query":{"exists":{"field":"user_profile.role"}}}},{"with_index":{"query":{"exists":{"field":"user_profile.location"}}}}]}}
-     Applies to Aggregates: COUNT(*)
-     Group By: user_profile.department, user_profile.role, user_profile.location
-     Aggregate Definition: {"grouped":{"aggs":{"grouped":{"aggs":{"grouped":{"terms":{"field":"user_profile.location","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"user_profile.role","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"user_profile.department","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field user_profile.department is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_multi_subfields)
+                                                                                                                             QUERY PLAN                                                                                                                              
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((user_profile ->> 'department'::text)), ((user_profile ->> 'role'::text)), ((user_profile ->> 'location'::text)), count(*)
+   Group Key: ((json_test_multi_subfields.user_profile ->> 'department'::text)), ((json_test_multi_subfields.user_profile ->> 'role'::text)), ((json_test_multi_subfields.user_profile ->> 'location'::text))
+   ->  Sort
+         Output: ((user_profile ->> 'department'::text)), ((user_profile ->> 'role'::text)), ((user_profile ->> 'location'::text))
+         Sort Key: ((json_test_multi_subfields.user_profile ->> 'department'::text)), ((json_test_multi_subfields.user_profile ->> 'role'::text)), ((json_test_multi_subfields.user_profile ->> 'location'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_multi_subfields
+               Output: (user_profile ->> 'department'::text), (user_profile ->> 'role'::text), (user_profile ->> 'location'::text)
+               Table: json_test_multi_subfields
+               Index: idx_json_multi_subfields
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"user_profile.department"}}}},{"with_index":{"query":{"exists":{"field":"user_profile.role"}}}},{"with_index":{"query":{"exists":{"field":"user_profile.location"}}}}]}}
+(14 rows)
 
 -- Execute the query
 SELECT 
@@ -1035,6 +1242,7 @@ WHERE id @@@ paradedb.exists('user_profile.department')
   AND id @@@ paradedb.exists('user_profile.location')
 GROUP BY user_profile->>'department', user_profile->>'role', user_profile->>'location'
 ORDER BY department, role, location;
+WARNING:  Aggregate Scan not used: grouping field user_profile.department is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_multi_subfields)
  department  |  role   | location | employee_count 
 -------------+---------+----------+----------------
  Engineering | Junior  | NYC      |              1
@@ -1058,16 +1266,24 @@ WHERE id @@@ paradedb.exists('user_profile.department')
   AND id @@@ paradedb.exists('order_details.category')
 GROUP BY user_profile->>'department', order_details->>'category'
 ORDER BY department, product_category;
-                                                                                                                                                                              QUERY PLAN                                                                                                                                                                              
-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_multi_subfields
-   Output: (user_profile ->> 'department'::text), (order_details ->> 'category'::text), pdb.agg_fn('COUNT(*)'::text), pdb.agg_fn('SUM'::text)
-   Index: idx_json_multi_subfields
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"user_profile.department"}}}},{"with_index":{"query":{"exists":{"field":"order_details.category"}}}}]}}
-     Applies to Aggregates: COUNT(*), SUM(order_details.quantity)
-     Group By: user_profile.department, order_details.category
-     Aggregate Definition: {"grouped":{"aggs":{"grouped":{"aggs":{"0":{"sum":{"field":"order_details.quantity","missing":null,"none_if_no_match":true}}},"terms":{"field":"order_details.category","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"user_profile.department","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field user_profile.department is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_multi_subfields)
+                                                                                             QUERY PLAN                                                                                             
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((user_profile ->> 'department'::text)), ((order_details ->> 'category'::text)), count(*), sum(((order_details ->> 'quantity'::text))::integer)
+   Group Key: ((json_test_multi_subfields.user_profile ->> 'department'::text)), ((json_test_multi_subfields.order_details ->> 'category'::text))
+   ->  Sort
+         Output: ((user_profile ->> 'department'::text)), ((order_details ->> 'category'::text)), order_details
+         Sort Key: ((json_test_multi_subfields.user_profile ->> 'department'::text)), ((json_test_multi_subfields.order_details ->> 'category'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_multi_subfields
+               Output: (user_profile ->> 'department'::text), (order_details ->> 'category'::text), order_details
+               Table: json_test_multi_subfields
+               Index: idx_json_multi_subfields
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"user_profile.department"}}}},{"with_index":{"query":{"exists":{"field":"order_details.category"}}}}]}}
+(14 rows)
 
 -- Execute the query
 SELECT 
@@ -1080,6 +1296,7 @@ WHERE id @@@ paradedb.exists('user_profile.department')
   AND id @@@ paradedb.exists('order_details.category')
 GROUP BY user_profile->>'department', order_details->>'category'
 ORDER BY department, product_category;
+WARNING:  Aggregate Scan not used: grouping field user_profile.department is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_multi_subfields)
  department  | product_category | order_count | total_quantity 
 -------------+------------------+-------------+----------------
  Engineering | electronics      |           3 |              9
@@ -1105,16 +1322,24 @@ WHERE id @@@ paradedb.exists('user_profile.department')
 GROUP BY user_profile->>'department', user_profile->>'location', 
          order_details->>'product', order_details->>'category'
 ORDER BY department, location, product;
-                                                                                                                                                                                                                                                                                                                        QUERY PLAN                                                                                                                                                                                                                                                                                                                        
-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_multi_subfields
-   Output: (user_profile ->> 'department'::text), (user_profile ->> 'location'::text), (order_details ->> 'product'::text), (order_details ->> 'category'::text), pdb.agg_fn('COUNT(*)'::text), pdb.agg_fn('AVG'::text), pdb.agg_fn('SUM'::text)
-   Index: idx_json_multi_subfields
-   Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"user_profile.department"}}}},{"with_index":{"query":{"exists":{"field":"order_details.category"}}}}]}}
-     Applies to Aggregates: COUNT(*), AVG(order_details.price), SUM(order_details.quantity)
-     Group By: user_profile.department, user_profile.location, order_details.product, order_details.category
-     Aggregate Definition: {"grouped":{"aggs":{"grouped":{"aggs":{"grouped":{"aggs":{"grouped":{"aggs":{"0":{"avg":{"field":"order_details.price","missing":null}},"1":{"sum":{"field":"order_details.quantity","missing":null,"none_if_no_match":true}}},"terms":{"field":"order_details.category","segment_size":65000,"size":65000}}},"terms":{"field":"order_details.product","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"user_profile.location","order":{"_key":"asc"},"segment_size":65000,"size":65000}}},"terms":{"field":"user_profile.department","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field user_profile.department is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_multi_subfields)
+                                                                                                                                         QUERY PLAN                                                                                                                                         
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: ((user_profile ->> 'department'::text)), ((user_profile ->> 'location'::text)), ((order_details ->> 'product'::text)), ((order_details ->> 'category'::text)), count(*), avg(((order_details ->> 'price'::text))::numeric), sum(((order_details ->> 'quantity'::text))::integer)
+   Group Key: ((json_test_multi_subfields.user_profile ->> 'department'::text)), ((json_test_multi_subfields.user_profile ->> 'location'::text)), ((json_test_multi_subfields.order_details ->> 'product'::text)), ((json_test_multi_subfields.order_details ->> 'category'::text))
+   ->  Sort
+         Output: ((user_profile ->> 'department'::text)), ((user_profile ->> 'location'::text)), ((order_details ->> 'product'::text)), ((order_details ->> 'category'::text)), order_details
+         Sort Key: ((json_test_multi_subfields.user_profile ->> 'department'::text)), ((json_test_multi_subfields.user_profile ->> 'location'::text)), ((json_test_multi_subfields.order_details ->> 'product'::text)), ((json_test_multi_subfields.order_details ->> 'category'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_multi_subfields
+               Output: (user_profile ->> 'department'::text), (user_profile ->> 'location'::text), (order_details ->> 'product'::text), (order_details ->> 'category'::text), order_details
+               Table: json_test_multi_subfields
+               Index: idx_json_multi_subfields
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"exists":{"field":"user_profile.department"}}}},{"with_index":{"query":{"exists":{"field":"order_details.category"}}}}]}}
+(14 rows)
 
 -- Execute the query
 SELECT 
@@ -1131,16 +1356,17 @@ WHERE id @@@ paradedb.exists('user_profile.department')
 GROUP BY user_profile->>'department', user_profile->>'location', 
          order_details->>'product', order_details->>'category'
 ORDER BY department, location, product;
- department  | location | product |  category   | order_count | avg_price | total_quantity 
--------------+----------+---------+-------------+-------------+-----------+----------------
- Engineering | NYC      | mouse   | electronics |           1 |        25 |              5
- Engineering | SF       | desk    | furniture   |           1 |       300 |              2
- Engineering | SF       | laptop  | electronics |           1 |      1200 |              2
- Engineering | SF       | monitor | electronics |           1 |       400 |              2
- Marketing   | LA       | chair   | furniture   |           1 |       150 |              3
- Marketing   | LA       | tablet  | electronics |           1 |       500 |              1
- Marketing   | SF       | desk    | furniture   |           1 |       300 |              1
- Sales       | NYC      | laptop  | electronics |           1 |      1200 |              1
+WARNING:  Aggregate Scan not used: grouping field user_profile.department is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_multi_subfields)
+ department  | location | product |  category   | order_count |       avg_price       | total_quantity 
+-------------+----------+---------+-------------+-------------+-----------------------+----------------
+ Engineering | NYC      | mouse   | electronics |           1 |   25.0000000000000000 |              5
+ Engineering | SF       | desk    | furniture   |           1 |  300.0000000000000000 |              2
+ Engineering | SF       | laptop  | electronics |           1 | 1200.0000000000000000 |              2
+ Engineering | SF       | monitor | electronics |           1 |  400.0000000000000000 |              2
+ Marketing   | LA       | chair   | furniture   |           1 |  150.0000000000000000 |              3
+ Marketing   | LA       | tablet  | electronics |           1 |  500.0000000000000000 |              1
+ Marketing   | SF       | desk    | furniture   |           1 |  300.0000000000000000 |              1
+ Sales       | NYC      | laptop  | electronics |           1 | 1200.0000000000000000 |              1
 (8 rows)
 
 -- =========================================
@@ -1168,16 +1394,24 @@ FROM json_test_special
 WHERE id @@@ paradedb.exists('content.user-info.email@domain')
 GROUP BY content->'user-info'->>'email@domain'
 ORDER BY email_type;
-                                                                     QUERY PLAN                                                                      
------------------------------------------------------------------------------------------------------------------------------------------------------
- Custom Scan (ParadeDB Aggregate Scan) on public.json_test_special
-   Output: ((content -> 'user-info'::text) ->> 'email@domain'::text), pdb.agg_fn('COUNT(*)'::text)
-   Index: idx_json_special
-   Tantivy Query: {"with_index":{"query":{"exists":{"field":"content.user-info.email@domain"}}}}
-     Applies to Aggregates: COUNT(*)
-     Group By: content.user-info.email@domain
-     Aggregate Definition: {"grouped":{"terms":{"field":"content.user-info.email@domain","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(7 rows)
+WARNING:  Aggregate Scan not used: grouping field content.user-info.email@domain is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_special)
+                                                 QUERY PLAN                                                  
+-------------------------------------------------------------------------------------------------------------
+ GroupAggregate
+   Output: (((content -> 'user-info'::text) ->> 'email@domain'::text)), count(*)
+   Group Key: (((json_test_special.content -> 'user-info'::text) ->> 'email@domain'::text))
+   ->  Sort
+         Output: (((content -> 'user-info'::text) ->> 'email@domain'::text))
+         Sort Key: (((json_test_special.content -> 'user-info'::text) ->> 'email@domain'::text))
+         ->  Custom Scan (ParadeDB Base Scan) on public.json_test_special
+               Output: ((content -> 'user-info'::text) ->> 'email@domain'::text)
+               Table: json_test_special
+               Index: idx_json_special
+               Worker Selection: Cost model
+               Exec Method: NormalScanExecState
+               Scores: false
+               Tantivy Query: {"with_index":{"query":{"exists":{"field":"content.user-info.email@domain"}}}}
+(14 rows)
 
 -- Execute the query
 SELECT content->'user-info'->>'email@domain' AS email_type,
@@ -1186,6 +1420,7 @@ FROM json_test_special
 WHERE id @@@ paradedb.exists('content.user-info.email@domain')
 GROUP BY content->'user-info'->>'email@domain'
 ORDER BY email_type;
+WARNING:  Aggregate Scan not used: grouping field content.user-info.email@domain is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_special)
  email_type | count 
 ------------+-------
  personal   |     1

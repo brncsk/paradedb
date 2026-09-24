@@ -33,19 +33,26 @@ WHERE id @@@ paradedb.exists('metadata.category')
 GROUP BY metadata->>'category'
 ORDER BY 1
 LIMIT 5;
-                                                                  QUERY PLAN                                                                  
-----------------------------------------------------------------------------------------------------------------------------------------------
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_single)
+                                              QUERY PLAN                                              
+------------------------------------------------------------------------------------------------------
  Limit
-   Output: ((metadata ->> 'category'::text)), (pdb.agg_fn('COUNT(*)'::text))
-   ->  Custom Scan (ParadeDB Aggregate Scan) on public.json_test_single
-         Output: (metadata ->> 'category'::text), pdb.agg_fn('COUNT(*)'::text)
-         Index: idx_json_single
-         Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.category"}}}}
-           Applies to Aggregates: COUNT(*)
-           Group By: metadata.category
-           Limit: 5
-           Aggregate Definition: {"grouped":{"terms":{"field":"metadata.category","order":{"_key":"asc"},"segment_size":65000,"size":65000}}}
-(10 rows)
+   Output: ((metadata ->> 'category'::text)), (count(*))
+   ->  GroupAggregate
+         Output: ((metadata ->> 'category'::text)), count(*)
+         Group Key: ((json_test_single.metadata ->> 'category'::text))
+         ->  Sort
+               Output: ((metadata ->> 'category'::text))
+               Sort Key: ((json_test_single.metadata ->> 'category'::text))
+               ->  Custom Scan (ParadeDB Base Scan) on public.json_test_single
+                     Output: (metadata ->> 'category'::text)
+                     Table: json_test_single
+                     Index: idx_json_single
+                     Worker Selection: Cost model
+                     Exec Method: NormalScanExecState
+                     Scores: false
+                     Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.category"}}}}
+(16 rows)
 
 SELECT metadata->>'category' AS category, COUNT(*) AS count
 FROM json_test_single
@@ -53,6 +60,7 @@ WHERE id @@@ paradedb.exists('metadata.category')
 GROUP BY metadata->>'category'
 ORDER BY 1
 LIMIT 5;
+WARNING:  Aggregate Scan not used: grouping field metadata.category is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: json_test_single)
   category   | count 
 -------------+-------
  clothing    |     4
@@ -67,22 +75,29 @@ WHERE id @@@ paradedb.exists('metadata.category')
 GROUP BY metadata->>'category'
 ORDER BY 2
 LIMIT 5;
-                                                                                        QUERY PLAN                                                                                        
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.category is a JSON value, which is grouped by Postgres (table: json_test_single)
+                                                 QUERY PLAN                                                 
+------------------------------------------------------------------------------------------------------------
  Limit
    Output: ((metadata ->> 'category'::text)), (count(*))
-   ->  Custom Scan (ParadeDB Aggregate Scan)
+   ->  Sort
          Output: ((metadata ->> 'category'::text)), (count(*))
-         Backend: DataFusion
-         Indexes: idx_json_single (json_test_single)
-         Group By: metadata.category
-         Aggregates: COUNT(*)
-         DataFusion Physical Plan: 
-           : SortExec: TopK(fetch=5), expr=[agg_0@1 ASC NULLS LAST], preserve_partitioning=[false]
-           :   AggregateExec: mode=Single, gby=[metadata.category@0 as metadata.category], aggr=[count(1) as agg_0]
-           :     CooperativeExec
-           :       PgSearchScan: table=json_test_single, segments=1, eager=[metadata.category], visibility=eager, query={"with_index":{"query":{"exists":{"field":"metadata.category"}}}}
-(13 rows)
+         Sort Key: (count(*))
+         ->  GroupAggregate
+               Output: ((metadata ->> 'category'::text)), count(*)
+               Group Key: ((json_test_single.metadata ->> 'category'::text))
+               ->  Sort
+                     Output: ((metadata ->> 'category'::text))
+                     Sort Key: ((json_test_single.metadata ->> 'category'::text))
+                     ->  Custom Scan (ParadeDB Base Scan) on public.json_test_single
+                           Output: (metadata ->> 'category'::text)
+                           Table: json_test_single
+                           Index: idx_json_single
+                           Worker Selection: Cost model
+                           Exec Method: NormalScanExecState
+                           Scores: false
+                           Tantivy Query: {"with_index":{"query":{"exists":{"field":"metadata.category"}}}}
+(19 rows)
 
 SELECT metadata->>'category' AS category, COUNT(*) AS count
 FROM json_test_single
@@ -90,6 +105,7 @@ WHERE id @@@ paradedb.exists('metadata.category')
 GROUP BY metadata->>'category'
 ORDER BY 2
 LIMIT 5;
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column metadata.category is a JSON value, which is grouped by Postgres (table: json_test_single)
   category   | count 
 -------------+-------
  electronics |     3

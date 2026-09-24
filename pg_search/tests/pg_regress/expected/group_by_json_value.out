@@ -58,7 +58,34 @@ WARNING:  Aggregate Scan not used: grouping field data.n is a JSON value, which 
  2    |     1
 (2 rows)
 
--- Test 3: the JSON value itself
+-- Test 3: ordered by the aggregate alone, which the DataFusion backend answers
+EXPLAIN (COSTS OFF) SELECT data->>'n' AS n, count(*) FROM group_by_json_value WHERE description @@@ 'item' GROUP BY 1 ORDER BY 2 DESC LIMIT 1;
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column data.n is a JSON value, which is grouped by Postgres (table: group_by_json_value)
+                                                                                 QUERY PLAN                                                                                  
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit
+   ->  Sort
+         Sort Key: (count(*)) DESC
+         ->  GroupAggregate
+               Group Key: ((data ->> 'n'::text))
+               ->  Sort
+                     Sort Key: ((data ->> 'n'::text))
+                     ->  Custom Scan (ParadeDB Base Scan) on group_by_json_value
+                           Table: group_by_json_value
+                           Index: idx_group_by_json_value
+                           Exec Method: NormalScanExecState
+                           Scores: false
+                           Tantivy Query: {"with_index":{"query":{"parse_with_field":{"field":"description","query_string":"item","lenient":null,"conjunction_mode":null}}}}
+(13 rows)
+
+SELECT data->>'n' AS n, count(*) FROM group_by_json_value WHERE description @@@ 'item' GROUP BY 1 ORDER BY 2 DESC LIMIT 1;
+WARNING:  Aggregate Scan (DataFusion) not used: GROUP BY column data.n is a JSON value, which is grouped by Postgres (table: group_by_json_value)
+  n   | count 
+------+-------
+ 1.50 |     2
+(1 row)
+
+-- Test 4: the JSON value itself
 SELECT data->'n' AS n, count(*) FROM group_by_json_value WHERE description @@@ 'item' GROUP BY 1 ORDER BY 1;
 WARNING:  Aggregate Scan not used: grouping field data.n is a JSON value, which is grouped by Postgres. To disable this warning: SET paradedb.planner_warnings = 'off' (table: group_by_json_value)
   n   | count 
@@ -69,7 +96,7 @@ WARNING:  Aggregate Scan not used: grouping field data.n is a JSON value, which 
  true |     1
 (4 rows)
 
--- Test 4: a filter on a JSON value is still pushed down
+-- Test 5: a filter on a JSON value is still pushed down
 EXPLAIN (COSTS OFF) SELECT count(*) FROM group_by_json_value WHERE description @@@ 'item' AND data->>'n' = 'x';
                                                                                                      QUERY PLAN                                                                                                     
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -77,7 +104,7 @@ EXPLAIN (COSTS OFF) SELECT count(*) FROM group_by_json_value WHERE description @
    Index: idx_group_by_json_value
    Tantivy Query: {"boolean":{"must":[{"with_index":{"query":{"parse_with_field":{"field":"description","query_string":"item","lenient":null,"conjunction_mode":null}}}},{"term":{"field":"data.n","value":"x"}}]}}
      Applies to Aggregates: COUNT(*)
-     Aggregate Definition: {"0":{"value_count":{"field":"ctid","missing":null}}}
+     Aggregate Definition: {"0":{"filter":"*"}}
 (5 rows)
 
 SELECT count(*) FROM group_by_json_value WHERE description @@@ 'item' AND data->>'n' = 'x';
