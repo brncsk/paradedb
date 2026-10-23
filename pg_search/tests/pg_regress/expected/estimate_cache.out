@@ -1,0 +1,61 @@
+-- A search's row estimate is kept per backend, under the index state it read: a write, a
+-- delete or a rebuild of the index gives a new estimate, and an unchanged index the same one.
+CREATE EXTENSION IF NOT EXISTS pg_search;
+SET paradedb.enable_aggregate_custom_scan = off;
+CREATE TABLE estimate_cache (id int PRIMARY KEY, kind text, body text);
+INSERT INTO estimate_cache
+SELECT g, CASE WHEN g % 10 = 0 THEN 'rare' ELSE 'common' END, 'canal' FROM generate_series(1, 10000) g;
+CREATE INDEX estimate_cache_idx ON estimate_cache USING bm25 (id, kind, body);
+ANALYZE estimate_cache;
+CREATE FUNCTION estimate_cache_rows(q text) RETURNS text LANGUAGE plpgsql AS $$
+DECLARE plan json;
+BEGIN
+    EXECUTE 'EXPLAIN (FORMAT JSON) ' || q INTO plan;
+    RETURN plan -> 0 -> 'Plan' ->> 'Plan Rows';
+END
+$$;
+-- The same search on the same index gives the same estimate, the second time from the cache.
+SELECT estimate_cache_rows($$SELECT id FROM estimate_cache WHERE id @@@ paradedb.term('kind', 'rare')$$) AS first,
+       estimate_cache_rows($$SELECT id FROM estimate_cache WHERE id @@@ paradedb.term('kind', 'rare')$$) AS second;
+ first | second 
+-------+--------
+ 1000  | 1000
+(1 row)
+
+-- Another search is another entry.
+SELECT estimate_cache_rows($$SELECT id FROM estimate_cache WHERE id @@@ paradedb.term('kind', 'common')$$) AS common;
+ common 
+--------
+ 9000
+(1 row)
+
+-- New rows change the index state: the estimate follows them.
+INSERT INTO estimate_cache
+SELECT g, 'rare', 'canal' FROM generate_series(10001, 20000) g;
+ANALYZE estimate_cache;
+SELECT estimate_cache_rows($$SELECT id FROM estimate_cache WHERE id @@@ paradedb.term('kind', 'rare')$$) AS after_insert;
+ after_insert 
+--------------
+ 2000
+(1 row)
+
+-- So do deleted rows, once a vacuum has removed them from the index.
+DELETE FROM estimate_cache WHERE id > 10000;
+VACUUM ANALYZE estimate_cache;
+SELECT estimate_cache_rows($$SELECT id FROM estimate_cache WHERE id @@@ paradedb.term('kind', 'rare')$$) AS after_delete;
+ after_delete 
+--------------
+ 1000
+(1 row)
+
+-- And a rebuild, whose segments are new.
+REINDEX INDEX estimate_cache_idx;
+SELECT estimate_cache_rows($$SELECT id FROM estimate_cache WHERE id @@@ paradedb.term('kind', 'rare')$$) AS after_reindex;
+ after_reindex 
+---------------
+ 1000
+(1 row)
+
+DROP FUNCTION estimate_cache_rows(text);
+DROP TABLE estimate_cache;
+RESET paradedb.enable_aggregate_custom_scan;

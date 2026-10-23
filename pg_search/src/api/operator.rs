@@ -75,6 +75,7 @@ mod atatat;
 pub(crate) mod boost;
 pub(crate) mod const_score;
 mod eqeqeq;
+mod estimate_cache;
 pub(crate) mod fuzzy;
 mod hashhashhash;
 mod ororor;
@@ -730,23 +731,33 @@ fn open_and_estimate_docs(
     let heap_rel = indexrel
         .heap_relation()
         .expect("indexrel should be an index");
-    let row_estimate = RowEstimate::from_reltuples(heap_rel.reltuples().map(|r| r as f64));
+    let reltuples = heap_rel.reltuples().map(|r| r as f64);
+    let row_estimate = RowEstimate::from_reltuples(reltuples);
 
-    let opened;
-    let reader = match reader {
-        Some(reader) => reader,
-        None => {
-            opened = SearchIndexReader::open(
+    if let Some(reader) = reader {
+        return Some(reader.estimate_docs(row_estimate));
+    }
+
+    // Without a reader of the caller's, the estimate opens one on the largest segment and runs
+    // the query there. The same search on the same index state gives the same estimate, so it
+    // is kept for the next plan (see `estimate_cache`).
+    let fingerprint = estimate_cache::IndexFingerprint::read(indexrel);
+    estimate_cache::cached_estimate(
+        indexrel,
+        fingerprint,
+        reltuples,
+        search_query_input,
+        |search_query_input| {
+            let reader = SearchIndexReader::open(
                 indexrel,
                 search_query_input,
                 false,
                 MvccSatisfies::LargestSegment,
             )
             .ok()?;
-            &opened
-        }
-    };
-    Some(reader.estimate_docs(row_estimate))
+            Some(reader.estimate_docs(row_estimate))
+        },
+    )
 }
 
 /// The planner's row count for the partition a leaf index is attached to, `None` when
